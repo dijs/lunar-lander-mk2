@@ -1,11 +1,15 @@
 extends Node2D
 
+# Presets which determine different scenarios
+export var initial_velocity = Vector2.RIGHT * 100
+export var initial_rotation = -PI / 2
+export var gravity_pull = Vector2.DOWN * 5
+export var initial_spin = 0
+
 export var max_thrust = 50
 export var spin_amount = 3
-export var gravity_pull = Vector2.DOWN * 5
-export var fall_speed_threshold = 7
+export var fall_speed_threshold = 8
 export var angl_speed_threshold = 10
-export var initial_velocity = Vector2.RIGHT * 100
 
 var rotation_input = 0 # -1, 0, 1
 var velocity = Vector2.ZERO
@@ -19,16 +23,33 @@ var result = 0
 var _callback_ref = JavaScript.create_callback(self, "on_js_input")
 
 func _ready():
-	velocity = initial_velocity
+	reset()
 	var _e = $Lander/Explosion.connect("animation_finished", self, "on_exploded")
 	var dom = JavaScript.get_interface("window")
 	if dom:
 		dom.addEventListener('message', _callback_ref)
 
+func reset():
+	velocity = initial_velocity
+	fuel = 5
+	result = 0
+	hit_ground = false
+	spin = initial_spin
+	$Lander.position = Vector2(-436, -219)
+	$Lander.rotation = initial_rotation
+	$Lander/Sprite.show()
+
 func on_js_input(args):
 	var js_event = args[0]
 
 	var action = JSON.parse(js_event.data).result
+
+	if action.type == "reset":
+		initial_velocity = Vector2.RIGHT * action.initial_velocity
+		initial_rotation = action.initial_rotation
+		gravity_pull = Vector2.DOWN * action.gravity_amount
+		initial_spin = action.initial_spin
+		reset()
 
 	if action.type == "act":
 		rotation_input = action.rotate
@@ -49,6 +70,7 @@ func on_exploded():
 	$Lander/Explosion.hide()
 
 func handle_input():
+	pass
 	# For testing
 #	if Input.is_key_pressed(KEY_LEFT):
 #		rotation_input = -1
@@ -60,9 +82,8 @@ func handle_input():
 #		thrust = max_thrust
 #	else:
 #		thrust = 0
-	
-	if Input.is_key_pressed(KEY_R):
-		var _e = get_tree().reload_current_scene()
+#	if Input.is_key_pressed(KEY_R):
+#		reset()
 
 func get_thrust_direction():
 	var a = $Lander.global_position
@@ -79,15 +100,6 @@ func _physics_process(delta):
 	
 	if thrust > 0 and fuel <= 0:
 		thrust = 0
-	
-	
-	####
-	
-	var negate_vel_dir = velocity.normalized()
-	$Debug.set_point_position(0, $Lander.global_position)
-	$Debug.set_point_position(1, $Lander.global_position + negate_vel_dir * 32)
-	
-	####
 	
 	var thrusting = thrust > 0
 	
@@ -133,6 +145,7 @@ func _physics_process(delta):
 				$Lander/Sprite.hide()
 				$Lander/Thrust.hide()
 				$Lander/Explosion.show()
+				$Lander/Explosion.frame = 0
 				$Lander/Explosion.play()
 				result = -1
 			else:

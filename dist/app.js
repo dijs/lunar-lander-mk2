@@ -127,4 +127,25 @@ async function tick() {
   sendAction(action);
 }
 
+function reset(
+  initial_velocity = 100,
+  initial_rotation = -Math.PI / 2,
+  gravity_amount = 10,
+  initial_spin = -1
+) {
+  sendAction({
+    type: 'reset',
+    initial_velocity,
+    initial_rotation,
+    gravity_amount,
+    initial_spin,
+  });
+}
+
+// TODO: Before I can create the AI, I should refactor the smart assist to handle ALL of these scenarios
+
+const s1 = () => reset();
+const s2 = () => reset(100, -Math.PI / 2, 40, 0);
+const s3 = () => reset(100, -Math.PI / 2, 10, 5);
+
 setInterval(tick, 1000 / fps);
