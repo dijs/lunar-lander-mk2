@@ -5,9 +5,10 @@ export var spin_amount = 3
 export var gravity_pull = Vector2.DOWN * 5
 export var fall_speed_threshold = 7
 export var angl_speed_threshold = 10
+export var initial_velocity = Vector2.RIGHT * 100
 
 var rotation_input = 0 # -1, 0, 1
-var velocity = Vector2.RIGHT * 40
+var velocity = Vector2.ZERO
 var hit_ground = false
 var spin = 0
 var thrust = 0
@@ -18,6 +19,7 @@ var result = 0
 var _callback_ref = JavaScript.create_callback(self, "on_js_input")
 
 func _ready():
+	velocity = initial_velocity
 	var _e = $Lander/Explosion.connect("animation_finished", self, "on_exploded")
 	var dom = JavaScript.get_interface("window")
 	if dom:

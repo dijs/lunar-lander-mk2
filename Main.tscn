@@ -129,7 +129,7 @@ points = PoolVector2Array( 0, 0, 0, 30 )
 width = 1.0
 
 [node name="Lander" type="KinematicBody2D" parent="."]
-position = Vector2( -233, -96 )
+position = Vector2( -436, -219 )
 rotation = -1.5708
 
 [node name="Camera2D" type="Camera2D" parent="Lander"]
