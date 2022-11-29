@@ -22,11 +22,15 @@ function getStatus() {
   });
 }
 
-function orientToAngle({ rotation, angular_momentum }, targetAngle = 0) {
+function orientToAngle(
+  { rotation, angular_momentum },
+  targetAngle = 0,
+  errorThreshold = 0.1
+) {
   const rotation_error = targetAngle - rotation;
-  if (Math.abs(rotation_error) < 0.15) {
+  if (Math.abs(rotation_error) < errorThreshold) {
     const am_error = -angular_momentum;
-    if (Math.abs(am_error) < 0.15) {
+    if (Math.abs(am_error) < 0.1) {
       return 0;
     } else {
       return Math.sign(am_error);
@@ -45,8 +49,8 @@ function orientToAngle({ rotation, angular_momentum }, targetAngle = 0) {
 
 function killVelocity(status) {
   const speed = Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
-  // TODO: get t1 here, not from godot
-  const rotError = orientToAngle(status, status.t1);
+  const t1 = Math.atan2(status.velocity.y / speed, status.velocity.x / speed);
+  const rotError = orientToAngle(status, t1);
 
   if (rotError !== 0) {
     return {
@@ -67,7 +71,7 @@ function killVelocity(status) {
 }
 
 function orientForLanding(status) {
-  const err = orientToAngle(status, 0 + Math.PI / 2);
+  const err = orientToAngle(status, 0 + Math.PI / 2, 0.05);
   if (err !== 0) {
     return { rotate: err, thrust: 0 };
   } else {
@@ -76,23 +80,22 @@ function orientForLanding(status) {
   }
 }
 
+let lastAlt = 1000;
+
 function slowDown(status) {
   const speed = Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
-  const falling = status.velocity.y > 0;
-
-  if (status.altitude > 64) {
-    return { rotate: 0, thrust: 0 };
+  if (status.altitude > 100) {
+    return orientForLanding(status);
   }
-
-  const speed_max = status.altitude / 2;
-
-  if (falling && speed > speed_max) {
+  const speed_max = 1;
+  if (speed > speed_max && lastAlt > status.altitude) {
+    lastAlt = status.altitude - 2;
     return {
       rotate: 0,
       thrust: 1,
     };
   } else {
-    phase = 1;
+    phase = 0;
     return { rotate: 0, thrust: 0 };
   }
 }
@@ -122,4 +125,4 @@ async function tick() {
 
 // window.addEventListener('mousedown', tick);
 
-setInterval(tick, 1000 / 10);
+setInterval(tick, 1000 / 20);

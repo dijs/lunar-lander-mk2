@@ -89,14 +89,12 @@ func _physics_process(delta):
 	####
 	
 	var thrusting = thrust > 0
-	$Lander/Flames.visible = thrusting
-	$Lander/Flames.playing = thrusting
 	
 	if thrusting:
 		fuel -= delta
 		if fuel <= 0:
 			fuel = 0
-	
+
 	if hit_ground:
 		if result == 1:
 			$Lander.rotation = lerp($Lander.rotation, 0, 0.1)
@@ -108,6 +106,9 @@ func _physics_process(delta):
 			zoom_goal = Vector2.ONE * 0.5
 		
 		$Lander/Camera2D.zoom = lerp($Lander/Camera2D.zoom, zoom_goal, 0.1)
+	
+		$Lander/Flames.visible = thrusting
+		$Lander/Flames.playing = thrusting
 	
 		spin += rotation_input * delta * spin_amount
 		$Lander.rotate(spin * delta)
@@ -126,10 +127,10 @@ func _physics_process(delta):
 		var hit = $Lander.move_and_collide(velocity * delta)
 		if hit:
 			hit_ground = true
+			$Lander/Flames.hide()
 			if speed > fall_speed_threshold or ang_speed > angl_speed_threshold:
 				$Lander/Sprite.hide()
 				$Lander/Thrust.hide()
-				$Lander/Flames.hide()
 				$Lander/Explosion.show()
 				$Lander/Explosion.play()
 				result = -1

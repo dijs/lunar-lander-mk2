@@ -124,6 +124,7 @@ position = Vector2( 0, 117 )
 shape = SubResource( 2 )
 
 [node name="Debug" type="Line2D" parent="."]
+visible = false
 points = PoolVector2Array( 0, 0, 0, 30 )
 width = 1.0
 
