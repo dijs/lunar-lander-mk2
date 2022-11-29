@@ -187,3 +187,13 @@ margin_top = 47.0
 margin_right = 55.0
 margin_bottom = 61.0
 text = "Test"
+
+[node name="Altitude" type="Label" parent="CanvasLayer"]
+margin_left = 15.0
+margin_top = 64.0
+margin_right = 55.0
+margin_bottom = 78.0
+text = "Test"
+
+[node name="GroundLevel" type="Node2D" parent="."]
+position = Vector2( -152, 114 )

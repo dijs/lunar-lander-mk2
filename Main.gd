@@ -15,24 +15,49 @@ var zoom_goal = Vector2.ONE
 var fuel = 5
 var result = 0
 
+var _callback_ref = JavaScript.create_callback(self, "on_js_input")
+
 func _ready():
 	var _e = $Lander/Explosion.connect("animation_finished", self, "on_exploded")
+	var dom = JavaScript.get_interface("window")
+	if dom:
+		dom.addEventListener('message', _callback_ref)
+
+func on_js_input(args):
+	var js_event = args[0]
+
+	var action = JSON.parse(js_event.data).result
+
+	if action.type == "act":
+		rotation_input = action.rotate
+		thrust = action.thrust * max_thrust
+	
+	if action.type == "status" and js_event.ports[0]:
+		js_event.ports[0].postMessage(JSON.print({
+			"velocity": {
+				"x": velocity.x,
+				"y": velocity.y
+			},
+			"angular_momentum": spin,
+			"rotation": $Lander.rotation,
+			"altitude": $GroundLevel.global_position.y - $Lander.global_position.y
+		}))
 
 func on_exploded():
 	$Lander/Explosion.hide()
 
 func handle_input():
 	# For testing
-	if Input.is_key_pressed(KEY_LEFT):
-		rotation_input = -1
-	elif Input.is_key_pressed(KEY_RIGHT):
-		rotation_input = 1
-	else:
-		rotation_input = 0
-	if Input.is_key_pressed(KEY_SPACE) and fuel > 0:
-		thrust = max_thrust
-	else:
-		thrust = 0
+#	if Input.is_key_pressed(KEY_LEFT):
+#		rotation_input = -1
+#	elif Input.is_key_pressed(KEY_RIGHT):
+#		rotation_input = 1
+#	else:
+#		rotation_input = 0
+#	if Input.is_key_pressed(KEY_SPACE) and fuel > 0:
+#		thrust = max_thrust
+#	else:
+#		thrust = 0
 	
 	if Input.is_key_pressed(KEY_R):
 		var _e = get_tree().reload_current_scene()
@@ -49,6 +74,9 @@ func get_angular_speed(delta):
 
 func _physics_process(delta):
 	handle_input()
+	
+	if thrust > 0 and fuel <= 0:
+		thrust = 0
 	
 	var thrusting = thrust > 0
 	$Lander/Flames.visible = thrusting
@@ -82,6 +110,7 @@ func _physics_process(delta):
 		$CanvasLayer/FallSpeed.text = str("Fall Speed: ", speed, " m/s")
 		$CanvasLayer/AngularSpeed.text = str("Angular Speed: ", ang_speed,  " deg/s")
 		$CanvasLayer/Fuel.text = str("Fuel Left: ", round(fuel * 100) / 100,  " liters")
+		$CanvasLayer/Altitude.text = str("Alt: ", round($GroundLevel.global_position.y - $Lander.global_position.y))
 		
 		var hit = $Lander.move_and_collide(velocity * delta)
 		if hit:
