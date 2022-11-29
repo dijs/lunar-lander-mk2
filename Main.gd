@@ -3,7 +3,7 @@ extends Node2D
 export var max_thrust = 50
 export var spin_amount = 3
 export var gravity_pull = Vector2.DOWN * 5
-export var fall_speed_threshold = 5
+export var fall_speed_threshold = 7
 export var angl_speed_threshold = 10
 
 var rotation_input = 0 # -1, 0, 1

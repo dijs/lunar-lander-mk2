@@ -49,12 +49,15 @@ function orientToAngle(
 
 function killVelocity(status) {
   const speed = Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
-  const t1 = Math.atan2(status.velocity.y / speed, status.velocity.x / speed);
-  const rotError = orientToAngle(status, t1);
+  const kill_velocity_angle = Math.atan2(
+    status.velocity.y / speed,
+    status.velocity.x / speed
+  );
+  const rotation_error = orientToAngle(status, kill_velocity_angle);
 
-  if (rotError !== 0) {
+  if (rotation_error !== 0) {
     return {
-      rotate: rotError,
+      rotate: rotation_error,
       thrust: 0,
     };
   } else {
@@ -83,12 +86,10 @@ function orientForLanding(status) {
 let lastAlt = 1000;
 
 function slowDown(status) {
-  const speed = Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
-  if (status.altitude > 100) {
+  if (status.altitude > 64) {
     return orientForLanding(status);
   }
-  const speed_max = 1;
-  if (speed > speed_max && lastAlt > status.altitude) {
+  if (lastAlt > status.altitude) {
     lastAlt = status.altitude - 2;
     return {
       rotate: 0,
