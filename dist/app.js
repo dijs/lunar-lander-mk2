@@ -24,12 +24,12 @@ function getStatus() {
 
 function orientToAngle({ rotation, angular_momentum }, targetAngle = 0) {
   const rotation_error = targetAngle - rotation;
-  if (Math.abs(rotation_error) < 0.5) {
+  if (Math.abs(rotation_error) < 0.15) {
     const am_error = -angular_momentum;
-    if (Math.abs(am_error) > 0.1) {
-      return Math.sign(am_error);
-    } else {
+    if (Math.abs(am_error) < 0.15) {
       return 0;
+    } else {
+      return Math.sign(am_error);
     }
   } else {
     return Math.sign(rotation_error);
@@ -43,38 +43,83 @@ function orientToAngle({ rotation, angular_momentum }, targetAngle = 0) {
 // Once I have built the function, that should give me sufficent input/output to
 // train the network.
 
-function slowDown({ velocity }) {
-  const len = Math.sqrt(velocity.y ** 2 + velocity.x ** 2);
-  return len > 20 ? 1 : 0;
+function killVelocity(status) {
+  const speed = Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
+  // TODO: get t1 here, not from godot
+  const rotError = orientToAngle(status, status.t1);
+
+  if (rotError !== 0) {
+    return {
+      rotate: rotError,
+      thrust: 0,
+    };
+  } else {
+    if (speed > 5) {
+      return {
+        rotate: 0,
+        thrust: 1,
+      };
+    } else {
+      phase = 1;
+      return { rotate: 0, thrust: 0 };
+    }
+  }
 }
 
-const orientForLanding = (status) => orientToAngle(status, 0);
+function orientForLanding(status) {
+  const err = orientToAngle(status, 0 + Math.PI / 2);
+  if (err !== 0) {
+    return { rotate: err, thrust: 0 };
+  } else {
+    phase = 2;
+    return { rotate: 0, thrust: 0 };
+  }
+}
+
+function slowDown(status) {
+  const speed = Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
+  const falling = status.velocity.y > 0;
+
+  if (status.altitude > 64) {
+    return { rotate: 0, thrust: 0 };
+  }
+
+  const speed_max = status.altitude / 2;
+
+  if (falling && speed > speed_max) {
+    return {
+      rotate: 0,
+      thrust: 1,
+    };
+  } else {
+    phase = 1;
+    return { rotate: 0, thrust: 0 };
+  }
+}
+
+let phase = 0;
 
 function landingAssist(status) {
-  // TODO: Think of the landing in 3 phases
-
-  // 1. Kill velocity (rotate to negation vector and thrust until 0)
-
-  // 2. Orient the craft for landing
-  // 3. Slow down when close to ground
-
-  ////////////////////////
-
-  // if (status.altitude > 100) {
-  // kill vel
-
-  // return { rotate: orient(status), thrust: slowDown(status) };
-  // }
-
-  return { rotate: orientForLanding(status), thrust: 0 };
+  if (phase === 0) {
+    return killVelocity(status);
+  }
+  if (phase === 1) {
+    return orientForLanding(status);
+  }
+  if (phase === 2) {
+    return slowDown(status);
+  }
+  return { rotate: 0, thrust: 0 };
 }
 
 async function tick() {
   const status = await getStatus();
+  // TODO: Fix this in Godot
+  status.rotation += Math.PI / 2;
   const action = { type: 'act', ...landingAssist(status) };
   sendAction(action);
 }
 
 // window.addEventListener('mousedown', tick);
 
-setInterval(tick, 1000 / 30);
+setInterval(tick, 1000 / 10);

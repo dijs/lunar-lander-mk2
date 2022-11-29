@@ -123,6 +123,10 @@ tile_data = PoolIntArray( 524256, 0, 0, 524257, 0, 0, 524258, 0, 0, 524259, 0, 0
 position = Vector2( 0, 117 )
 shape = SubResource( 2 )
 
+[node name="Debug" type="Line2D" parent="."]
+points = PoolVector2Array( 0, 0, 0, 30 )
+width = 1.0
+
 [node name="Lander" type="KinematicBody2D" parent="."]
 position = Vector2( -233, -96 )
 rotation = -1.5708

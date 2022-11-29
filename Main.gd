@@ -3,7 +3,7 @@ extends Node2D
 export var max_thrust = 50
 export var spin_amount = 3
 export var gravity_pull = Vector2.DOWN * 5
-export var fall_speed_threshold = 3
+export var fall_speed_threshold = 5
 export var angl_speed_threshold = 10
 
 var rotation_input = 0 # -1, 0, 1
@@ -38,6 +38,7 @@ func on_js_input(args):
 				"x": velocity.x,
 				"y": velocity.y
 			},
+			"t1": velocity.normalized().angle(),
 			"angular_momentum": spin,
 			"rotation": $Lander.rotation,
 			"altitude": $GroundLevel.global_position.y - $Lander.global_position.y
@@ -78,6 +79,15 @@ func _physics_process(delta):
 	if thrust > 0 and fuel <= 0:
 		thrust = 0
 	
+	
+	####
+	
+	var negate_vel_dir = velocity.normalized()
+	$Debug.set_point_position(0, $Lander.global_position)
+	$Debug.set_point_position(1, $Lander.global_position + negate_vel_dir * 32)
+	
+	####
+	
 	var thrusting = thrust > 0
 	$Lander/Flames.visible = thrusting
 	$Lander/Flames.playing = thrusting
@@ -91,7 +101,8 @@ func _physics_process(delta):
 		if result == 1:
 			$Lander.rotation = lerp($Lander.rotation, 0, 0.1)
 	else:
-		if $Lander/RayCast2D.is_colliding():
+		var alt = $GroundLevel.global_position.y - $Lander.global_position.y
+		if alt < 100:
 			zoom_goal = Vector2.ONE * 0.25
 		else:
 			zoom_goal = Vector2.ONE * 0.5
@@ -118,6 +129,7 @@ func _physics_process(delta):
 			if speed > fall_speed_threshold or ang_speed > angl_speed_threshold:
 				$Lander/Sprite.hide()
 				$Lander/Thrust.hide()
+				$Lander/Flames.hide()
 				$Lander/Explosion.show()
 				$Lander/Explosion.play()
 				result = -1
