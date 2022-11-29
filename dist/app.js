@@ -1,3 +1,5 @@
+const fps = 20;
+
 engine.startGame({
   // canvasResizePolicy: 0,
 });
@@ -22,6 +24,12 @@ function getStatus() {
   });
 }
 
+// Smart Assist Functions
+
+// Memory
+let lastAlt = 1000;
+let phase = 0;
+
 function orientToAngle(
   { rotation, angular_momentum },
   targetAngle = 0,
@@ -40,13 +48,6 @@ function orientToAngle(
   }
 }
 
-// I need to prove that I can create a "Smart Landing Assist" function with
-// only these inputs. Only then can I confirm that a neural network could learn
-// to do the same
-
-// Once I have built the function, that should give me sufficent input/output to
-// train the network.
-
 function killVelocity(status) {
   const speed = Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
   const kill_velocity_angle = Math.atan2(
@@ -54,7 +55,6 @@ function killVelocity(status) {
     status.velocity.x / speed
   );
   const rotation_error = orientToAngle(status, kill_velocity_angle);
-
   if (rotation_error !== 0) {
     return {
       rotate: rotation_error,
@@ -83,8 +83,6 @@ function orientForLanding(status) {
   }
 }
 
-let lastAlt = 1000;
-
 function slowDown(status) {
   if (status.altitude > 64) {
     return orientForLanding(status);
@@ -101,8 +99,6 @@ function slowDown(status) {
   }
 }
 
-let phase = 0;
-
 function landingAssist(status) {
   if (phase === 0) {
     return killVelocity(status);
@@ -116,14 +112,19 @@ function landingAssist(status) {
   return { rotate: 0, thrust: 0 };
 }
 
+// AI Landing Assist starts here
+
+// Status will need to be converted into "input"
+// Actions will be the "output" of the network
+
+// Use the smart assist function to create a bunch of training data (easiest)
+
+// Once that works, throw different scenarios at the network for testing
+
 async function tick() {
   const status = await getStatus();
-  // TODO: Fix this in Godot
-  status.rotation += Math.PI / 2;
   const action = { type: 'act', ...landingAssist(status) };
   sendAction(action);
 }
 
-// window.addEventListener('mousedown', tick);
-
-setInterval(tick, 1000 / 20);
+setInterval(tick, 1000 / fps);

@@ -40,9 +40,8 @@ func on_js_input(args):
 				"x": velocity.x,
 				"y": velocity.y
 			},
-			"t1": velocity.normalized().angle(),
 			"angular_momentum": spin,
-			"rotation": $Lander.rotation,
+			"rotation": $Lander.rotation + PI / 2,
 			"altitude": $GroundLevel.global_position.y - $Lander.global_position.y
 		}))
 
