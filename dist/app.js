@@ -30,32 +30,40 @@ function getStatus() {
 let lastAlt = 1000;
 let phase = 0;
 
+const max_landing_speed = 5;
 const landing_altitude_threshold = 75;
+const hit_the_brakes_altitude = 100;
+const danger_altitude = 50;
+const landing_rotation_goal = Math.PI / 2;
+const nothing = {
+  rotate: 0,
+  thrust: 0,
+};
 
 function getAllowedRotationSpeed(status) {
   return status.altitude > landing_altitude_threshold ? 0.3 : 0.05;
+}
+
+function getAllowedRotationError(status) {
+  return status.altitude > landing_altitude_threshold ? 0.1 : 0.5;
 }
 
 function getSpeed(status) {
   return Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
 }
 
-const nothing = {
-  rotate: 0,
-  thrust: 0,
-};
-
 function killVelocity(status) {
   const rot_error = getKillVelocityAngleError(status);
-  // const allowed_rot_speed = getAllowedRotationSpeed(status);
-
-  // TODO: This may need to be a variable
-  if (Math.abs(rot_error) > 0.1) {
+  if (Math.abs(rot_error) > getAllowedRotationError(status)) {
+    console.log(
+      `Kill rotation was off by ${Math.abs(
+        rot_error
+      )}, kicking back to first phase`
+    );
     phase = 0;
     return nothing;
   } else {
-    // const allowed_speed = status.altitude > landing_altitude_threshold ? 5 : 1;
-    if (getSpeed(status) > 5) {
+    if (getSpeed(status) > max_landing_speed) {
       return {
         rotate: 0,
         thrust: 1,
@@ -68,31 +76,31 @@ function killVelocity(status) {
   }
 }
 
-const hit_the_brakes_altitude = 100;
-
 function orientForLanding(status) {
   const allowed_rot_goal_err = 0.05;
 
+  if (status.altitude < danger_altitude && getSpeed(status) > 10) {
+    console.log('Was in danger of crash, kicking back to killing velocity');
+    phase = 1;
+    return nothing;
+  }
+
   const am_error = -status.angular_momentum;
   if (Math.abs(am_error) > getAllowedRotationSpeed(status)) {
-    console.log('a');
     return { rotate: Math.sign(am_error), thrust: 0 };
   }
 
-  // TODO: Try another atan2 for the current rotation
-  let rot_err = Math.PI / 2 - status.rotation;
+  let rot_err = landing_rotation_goal - status.rotation;
   if (Math.abs(rot_err) > allowed_rot_goal_err) {
-    console.log('b');
     return { rotate: Math.sign(rot_err), thrust: 0 };
   }
 
   if (status.altitude < hit_the_brakes_altitude) {
     phase = 1;
-    return { rotate: 0, thrust: 0 };
+    return nothing;
   }
 
-  console.log('done orienting for landing');
-  return { rotate: 0, thrust: 0 };
+  return nothing;
 }
 
 function getKillVelocityAngleError({ rotation, velocity }) {
@@ -102,23 +110,20 @@ function getKillVelocityAngleError({ rotation, velocity }) {
 }
 
 function orientToAngle(status, goal) {
-  const allowed_rot_speed = status.altitude > 30 ? 0.7 : 0.05;
-  const allowed_rot_goal_err = 0.1;
-
   const am_error = -status.angular_momentum;
-  if (Math.abs(am_error) > allowed_rot_speed) {
+  if (Math.abs(am_error) > getAllowedRotationSpeed(status)) {
     return { rotate: Math.sign(am_error), thrust: 0 };
   }
 
   // TODO: Try another atan2 for the current rotation
   let rot_err = goal - status.rotation;
-  if (Math.abs(rot_err) > allowed_rot_goal_err) {
+  if (Math.abs(rot_err) > getAllowedRotationError(status)) {
     return { rotate: Math.sign(rot_err), thrust: 0 };
   }
 
   console.log('done orienting');
   phase = 1;
-  return { rotate: 0, thrust: 0 };
+  return nothing;
 }
 
 function orientToKillAngle(status) {
@@ -130,8 +135,6 @@ function orientToKillAngle(status) {
   );
   return orientToAngle(status, kill_angle);
 }
-
-function land(status) {}
 
 function landingAssist(status) {
   if (phase === 0) {
@@ -180,7 +183,7 @@ async function tick() {
     document.getElementById('status').innerHTML = 'Landed';
   }
   if (status.landed === -1) {
-    // console.log('Crashed while', PhaseDescriptions[phase]);
+    console.log('Crashed while', PhaseDescriptions[phase]);
     document.getElementById('status').innerHTML = 'Crashed';
   }
 }
