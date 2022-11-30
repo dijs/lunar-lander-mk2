@@ -17,7 +17,7 @@ var hit_ground = false
 var spin = 0
 var thrust = 0
 var zoom_goal = Vector2.ONE
-var fuel = 5
+var fuel = 10
 var result = 0
 
 var _callback_ref = JavaScript.create_callback(self, "on_js_input")
@@ -63,7 +63,8 @@ func on_js_input(args):
 			},
 			"angular_momentum": spin,
 			"rotation": $Lander.rotation + PI / 2,
-			"altitude": $GroundLevel.global_position.y - $Lander.global_position.y
+			"altitude": $GroundLevel.global_position.y - $Lander.global_position.y,
+			"landed": result
 		}))
 
 func on_exploded():
