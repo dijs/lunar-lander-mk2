@@ -5,6 +5,7 @@ export var initial_velocity = Vector2.RIGHT * 100
 export var initial_rotation = -PI / 2
 export var gravity_pull = Vector2.DOWN * 5
 export var initial_spin = 0
+export var initial_fuel = 20
 
 export var max_thrust = 50
 export var spin_amount = 3
@@ -17,7 +18,7 @@ var hit_ground = false
 var spin = 0
 var thrust = 0
 var zoom_goal = Vector2.ONE
-var fuel = 10
+var fuel = 0
 var result = 0
 
 var _callback_ref = JavaScript.create_callback(self, "on_js_input")
@@ -31,7 +32,7 @@ func _ready():
 
 func reset():
 	velocity = initial_velocity
-	fuel = 5
+	fuel = initial_fuel
 	result = 0
 	hit_ground = false
 	spin = initial_spin
