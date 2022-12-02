@@ -109,3 +109,8 @@ func _physics_process(delta):
 				result = CRASHED
 			else:
 				result = LANDED
+		
+		# Check if it fell outside of bounds
+		if position.y > 200:
+			result = CRASHED
+			$RemoveTimer.start()

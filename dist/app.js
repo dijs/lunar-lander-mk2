@@ -9,9 +9,13 @@ const LANDED = 1;
 const CRASHED = -1;
 
 const ground_level = 114;
+const generationSize = 8;
 
-const network = new NeuralNetwork();
-const neuroEvolution = new NeuroEvolution();
+let generation = 1;
+let networks = {};
+let started = false;
+
+////////////////////////////////////////////////////////////
 
 engine.startGame();
 
@@ -204,7 +208,7 @@ function getAction(rotateLeft, rotateRight, throttleOn) {
 }
 
 function machineLandingAssist(status) {
-  let outputs = network.predict(getInput(status));
+  let outputs = networks[status.id].predict(getInput(status));
   return getAction(...outputs);
 }
 
@@ -265,19 +269,66 @@ function reset(
   });
 }
 
-function add() {
+function addRandomLander() {
   const id = '' + id_counter;
   sendAction({ type: 'create', id, x: -436, y: -219 });
-  landers[id] = { status: LANDING, phase: 0, score: 0 };
+  landers[id] = { status: LANDING, phase: 0, score: 0, gen: generation };
+  networks[id] = new NeuralNetwork();
   id_counter += 1;
 }
 
 function gameLoop() {
+  let readyForNextGeneration = true;
   for (let id in landers) {
     if (landers[id].status === LANDING) {
       tick(id);
+      readyForNextGeneration = false;
     }
+  }
+  if (started && readyForNextGeneration) {
+    createNextGeneration();
   }
 }
 
 setInterval(gameLoop, 1000 / fps);
+
+function init() {
+  for (let i = 0; i < generationSize; i++) {
+    addRandomLander();
+  }
+  started = true;
+}
+
+function findBestNetwork() {
+  let bestId = 0;
+  let bestScore = -100000;
+  for (let id in landers) {
+    if (landers[id].gen === generation && landers[id].score > bestScore) {
+      bestScore = landers[id].score;
+      bestId = id;
+    }
+  }
+  console.log('Best lander was', bestId, 'with a score of', bestScore);
+  return networks[bestId];
+}
+
+function createNextGeneration() {
+  const best = findBestNetwork();
+  generation++;
+  const nextGenerationNetworks = {};
+
+  for (let i = 0; i < generationSize; i++) {
+    const id = '' + id_counter;
+    landers[id] = { status: LANDING, phase: 0, score: 0, gen: generation };
+    nextGenerationNetworks[id] = mutateNeuralNetwork(best);
+    sendAction({ type: 'create', id, x: -436, y: -219 });
+    id_counter += 1;
+  }
+
+  for (let id in networks) {
+    networks[id].dispose();
+  }
+
+  networks = nextGenerationNetworks;
+  console.log('Started Generation', generation);
+}

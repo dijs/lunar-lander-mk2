@@ -96,27 +96,25 @@ class NeuralNetwork {
 // 4. Create new generation by mutating the best lander
 // 5. Go to #1
 
-class NeuroEvolution {
-  mutateNeuralNetwork(b) {
-    function fn(x) {
-      if (random(1) < 0.05) {
-        let offset = randomGaussian() * 0.5;
-        let newx = x + offset;
-        return newx;
-      }
-      return x;
-    }
-
-    let neuralNetwork = b.clone();
-    let ih = neuralNetwork.input_weights.dataSync().map(fn);
-    let ih_shape = neuralNetwork.input_weights.shape;
-    neuralNetwork.input_weights.dispose();
-    neuralNetwork.input_weights = tf.tensor(ih, ih_shape);
-
-    let ho = neuralNetwork.output_weights.dataSync().map(fn);
-    let ho_shape = neuralNetwork.output_weights.shape;
-    neuralNetwork.output_weights.dispose();
-    neuralNetwork.output_weights = tf.tensor(ho, ho_shape);
-    return neuralNetwork;
+function fn(x) {
+  if (random(1) < 0.05) {
+    let offset = randomGaussian() * 0.5;
+    let newx = x + offset;
+    return newx;
   }
+  return x;
+}
+
+function mutateNeuralNetwork(b) {
+  let neuralNetwork = b.clone();
+  let ih = neuralNetwork.input_weights.dataSync().map(fn);
+  let ih_shape = neuralNetwork.input_weights.shape;
+  neuralNetwork.input_weights.dispose();
+  neuralNetwork.input_weights = tf.tensor(ih, ih_shape);
+
+  let ho = neuralNetwork.output_weights.dataSync().map(fn);
+  let ho_shape = neuralNetwork.output_weights.shape;
+  neuralNetwork.output_weights.dispose();
+  neuralNetwork.output_weights = tf.tensor(ho, ho_shape);
+  return neuralNetwork;
 }
