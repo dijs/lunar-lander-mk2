@@ -11,6 +11,7 @@ const CRASHED = -1;
 const ground_level = 114;
 
 const network = new NeuralNetwork();
+const neuroEvolution = new NeuroEvolution();
 
 engine.startGame();
 
@@ -224,13 +225,15 @@ async function tick(id) {
       getKillVelocityAngleError(status);
   }
   if (status.landed === 1) {
-    landers[id] = LANDED;
+    landers[id].status = LANDED;
+    landers[id].score = 100;
     document.getElementById('status').innerHTML = 'Landed';
     console.log(id, 'landed');
   }
   if (status.landed === -1) {
-    landers[id] = CRASHED;
+    landers[id].status = CRASHED;
     console.log(id, 'crashed');
+    landers[id].score = getFitnessScore(status);
     log(
       'Crashed while',
       PhaseDescriptions[phase],
