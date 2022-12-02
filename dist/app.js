@@ -201,9 +201,11 @@ async function tick(id) {
   if (status.landed === 1) {
     landers[id] = LANDED;
     document.getElementById('status').innerHTML = 'Landed';
+    console.log(id, 'landed');
   }
   if (status.landed === -1) {
     landers[id] = CRASHED;
+    console.log(id, 'crashed');
     log(
       'Crashed while',
       PhaseDescriptions[phase],
@@ -245,24 +247,20 @@ function add() {
 
 function gameLoop() {
   for (let id in landers) {
-    tick(id);
+    if (landers[id] === LANDING) {
+      tick(id);
+    }
   }
 }
 
 setInterval(gameLoop, 1000 / fps);
 
-// TODO: Before I can create the AI, I should refactor the smart assist to handle ALL of these scenarios
-
-// Thoughts:
-
-// - Negate initial spin if any
-// - High gravity is failing b/c "Kill Velocity" function is prioritizing orientation correctness over reducing speed
-
+// TODO: Not using these
 const s1 = () => reset(128);
 const s2 = () => reset(128, 100, -Math.PI / 2, 20, 0);
 const s3 = () => reset(128, 100, -Math.PI / 2, 10, 5);
 
-// AI Version here....
+// AI Version here //////////////////////////
 
 const r = () => (Math.random() > 0.5 ? 1 : 0);
 
@@ -281,7 +279,7 @@ function getAction([rotateLeft, rotateRight, throttleOn]) {
   return { rotate, thrust };
 }
 
-function runSimulation(network) {
+/*function runSimulation(network) {
   return new Promise((resolve) => {
     const gameLoop = setInterval(async () => {
       // TODO: I could wait until this genome index is ready
@@ -312,7 +310,7 @@ function runSimulation(network) {
       }
     }, 1000 / fps);
   });
-}
+}*/
 
 // const population = new window.Population(1, 5, 3, false);
 
