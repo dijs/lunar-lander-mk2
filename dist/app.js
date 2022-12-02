@@ -9,7 +9,7 @@ const LANDED = 1;
 const CRASHED = -1;
 
 const ground_level = 114;
-const generationSize = 8;
+const generationSize = 32;
 
 let generation = 1;
 let networks = {};
@@ -190,15 +190,17 @@ const PhaseDescriptions = {
   2: 'Orienting For Landing',
 };
 
-// function getInput({ velocity, altitude, angular_momentum, rotation }) {
-// return [velocity.x, velocity.y, altitude, angular_momentum, rotation];
-
 function getInput({ altitude }) {
   return [altitude / ground_level];
 }
 
 function getFitnessScore(status) {
-  return 100 - getSpeed(status) - Math.abs(status.angular_momentum) * 10;
+  return (
+    100 -
+    getSpeed(status) -
+    Math.abs(status.angular_momentum) * 10 -
+    status.x_err
+  );
 }
 
 function getAction(rotateLeft, rotateRight, throttleOn) {

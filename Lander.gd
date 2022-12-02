@@ -40,6 +40,7 @@ func get_status():
 			"x": velocity.x,
 			"y": velocity.y
 		},
+		"x_err": abs(global_position.x),
 		"angular_momentum": spin,
 		"rotation": rotation + PI / 2,
 		"altitude": ground_level - global_position.y,
