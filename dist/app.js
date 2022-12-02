@@ -228,6 +228,8 @@ function reset(
   });
 }
 
+setInterval(tick, 1000 / 10);
+
 // TODO: Before I can create the AI, I should refactor the smart assist to handle ALL of these scenarios
 
 // Thoughts:
@@ -239,4 +241,85 @@ const s1 = () => reset();
 const s2 = () => reset(100, -Math.PI / 2, 20, 0);
 const s3 = () => reset(100, -Math.PI / 2, 10, 5);
 
-setInterval(tick, 1000 / fps);
+// AI Version here....
+
+const r = () => (Math.random() > 0.5 ? 1 : 0);
+
+function getInput({ velocity, altitude, angular_momentum, rotation }) {
+  return [r(), r(), r(), r(), r()];
+  // return [velocity.x, velocity.y, altitude, angular_momentum, rotation];
+}
+
+function getFitnessScore(status) {
+  return 100 - getSpeed(status) - Math.abs(status.angular_momentum) * 10;
+}
+
+function getAction([rotateLeft, rotateRight, throttleOn]) {
+  const rotate = rotateLeft > 0.5 ? -1 : rotateRight > 0.5 ? 1 : 0;
+  const thrust = throttleOn > 0.5 ? 1 : 0;
+  return { rotate, thrust };
+}
+
+function runSimulation(network) {
+  return new Promise((resolve) => {
+    const gameLoop = setInterval(async () => {
+      // TODO: I could wait until this genome index is ready
+
+      const status = await getStatus();
+      if (status.landed === 0) {
+        const input = getInput(status);
+        // console.log('input', input);
+        const prediction = network.predict(input);
+        console.log(
+          'input',
+          input,
+          'prediction',
+          prediction,
+          'action',
+          getAction(prediction)
+        );
+        const action = { type: 'act', ...getAction(prediction) };
+        sendAction(action);
+      }
+      if (status.landed === 1) {
+        clearInterval(gameLoop);
+        resolve(100);
+      }
+      if (status.landed === -1) {
+        clearInterval(gameLoop);
+        resolve(getFitnessScore(status));
+      }
+    }, 1000 / fps);
+  });
+}
+
+// const population = new window.Population(1, 5, 3, false);
+
+// population.evolve(1, async (genome) => {
+//   const network = genome.generateNetwork();
+//   console.log('Starting genome');
+//   const score = await runSimulation(network);
+//   console.log('Finished genome');
+//   return score;
+// });
+
+/*const population = new window.Population(50, 2, 1, false);
+const xor = [
+  [[0, 0], 0],
+  [[0, 1], 1],
+  [[1, 0], 1],
+  [[1, 1], 0],
+];
+
+population.evolve(1000, (genome) => {
+  const network = genome.generateNetwork();
+  let error = 0;
+  for (const [input, output] of xor) {
+    const [prediction] = network.predict(input);
+    error += Math.abs(prediction - output);
+  }
+  return 1 - error / xor.length;
+});
+
+log('evolved');
+*/
