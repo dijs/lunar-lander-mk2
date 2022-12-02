@@ -3,7 +3,6 @@ const fps = 10;
 let id_counter = 128;
 
 const landers = {};
-const memory = {};
 
 const LANDING = 0;
 const LANDED = 1;
@@ -85,7 +84,7 @@ function killVelocity(status) {
         rot_error
       )}, kicking back to first phase. Burn time was: ${timeSinceLastBurn}`
     );
-    memory[status.id].phase = 0;
+    landers[status.id].phase = 0;
     return nothing;
   } else {
     if (getSpeed(status) > max_landing_speed) {
@@ -95,7 +94,7 @@ function killVelocity(status) {
         thrust: 1,
       };
     } else {
-      memory[status.id].phase = 2;
+      landers[status.id].phase = 2;
       log('killed velocity. burned for', timeSinceLastBurn, 'millis');
       return nothing;
     }
@@ -107,7 +106,7 @@ function orientForLanding(status) {
 
   if (status.altitude < danger_altitude && getSpeed(status) > 7) {
     log('Was in danger of crash, kicking back to killing velocity');
-    memory[status.id].phase = 1;
+    landers[status.id].phase = 1;
     return nothing;
   }
 
@@ -122,7 +121,7 @@ function orientForLanding(status) {
   }
 
   if (status.altitude < hit_the_brakes_altitude) {
-    memory[status.id].phase = 1;
+    landers[status.id].phase = 1;
     return nothing;
   }
 
@@ -138,7 +137,7 @@ function orientToKillAngle(status) {
 
   if (status.altitude < danger_altitude && speed > 7) {
     log('Was in danger of crash, kicking back to killing velocity');
-    memory[status.id].phase = 1;
+    landers[status.id].phase = 1;
     return nothing;
   }
 
@@ -154,18 +153,18 @@ function orientToKillAngle(status) {
   }
 
   log('done orienting');
-  memory[status.id].phase = 1;
+  landers[status.id].phase = 1;
   return nothing;
 }
 
 function landingAssist(status) {
-  if (memory[status.id].phase === 0) {
+  if (landers[status.id].phase === 0) {
     return orientToKillAngle(status);
   }
-  if (memory[status.id].phase === 1) {
+  if (landers[status.id].phase === 1) {
     return killVelocity(status);
   }
-  if (memory[status.id].phase === 2) {
+  if (landers[status.id].phase === 2) {
     return orientForLanding(status);
   }
   return nothing;
@@ -184,13 +183,13 @@ const PhaseDescriptions = {
   0: 'Orienting to Kill Velocity Angle',
   1: 'Killing Velocity',
   2: 'Orienting For Landing',
-  // 3: 'Slowing Down',
 };
 
-function getInput({ velocity, altitude, angular_momentum, rotation }) {
+// function getInput({ velocity, altitude, angular_momentum, rotation }) {
+// return [velocity.x, velocity.y, altitude, angular_momentum, rotation];
+
+function getInput({ altitude }) {
   return [altitude / ground_level];
-  // return [r(), r(), r(), r(), r()];
-  // return [velocity.x, velocity.y, altitude, angular_momentum, rotation];
 }
 
 function getFitnessScore(status) {
@@ -252,7 +251,7 @@ function reset(
   gravity_amount = 10,
   initial_spin = -1
 ) {
-  memory[id].phase = 0;
+  landers[id].phase = 0;
   sendAction({
     type: 'reset',
     id,
@@ -266,14 +265,13 @@ function reset(
 function add() {
   const id = '' + id_counter;
   sendAction({ type: 'create', id, x: -436, y: -219 });
-  landers[id] = LANDING;
-  memory[id] = { phase: 0 };
+  landers[id] = { status: LANDING, phase: 0, score: 0 };
   id_counter += 1;
 }
 
 function gameLoop() {
   for (let id in landers) {
-    if (landers[id] === LANDING) {
+    if (landers[id].status === LANDING) {
       tick(id);
     }
   }
