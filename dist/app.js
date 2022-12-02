@@ -9,6 +9,10 @@ const LANDING = 0;
 const LANDED = 1;
 const CRASHED = -1;
 
+const ground_level = 114;
+
+const network = new NeuralNetwork();
+
 engine.startGame();
 
 function sendAction(action) {
@@ -183,11 +187,33 @@ const PhaseDescriptions = {
   // 3: 'Slowing Down',
 };
 
+function getInput({ velocity, altitude, angular_momentum, rotation }) {
+  return [altitude / ground_level];
+  // return [r(), r(), r(), r(), r()];
+  // return [velocity.x, velocity.y, altitude, angular_momentum, rotation];
+}
+
+function getFitnessScore(status) {
+  return 100 - getSpeed(status) - Math.abs(status.angular_momentum) * 10;
+}
+
+function getAction(rotateLeft, rotateRight, throttleOn) {
+  const rotate = rotateLeft > 0.5 ? -1 : rotateRight > 0.5 ? 1 : 0;
+  const thrust = throttleOn > 0.5 ? 1 : 0;
+  return { rotate, thrust };
+}
+
+function machineLandingAssist(status) {
+  let outputs = network.predict(getInput(status));
+  return getAction(...outputs);
+}
+
 async function tick(id) {
   const status = await getStatus(id);
 
   if (status.landed === 0) {
-    const action = { type: 'act', id, ...landingAssist(status) };
+    // const action = { type: 'act', id, ...landingAssist(status) };
+    const action = { type: 'act', id, ...machineLandingAssist(status) };
     sendAction(action);
     document.getElementById('status').innerHTML =
       PhaseDescriptions[phase] +
@@ -254,91 +280,3 @@ function gameLoop() {
 }
 
 setInterval(gameLoop, 1000 / fps);
-
-// TODO: Not using these
-const s1 = () => reset(128);
-const s2 = () => reset(128, 100, -Math.PI / 2, 20, 0);
-const s3 = () => reset(128, 100, -Math.PI / 2, 10, 5);
-
-// AI Version here //////////////////////////
-
-const r = () => (Math.random() > 0.5 ? 1 : 0);
-
-function getInput({ velocity, altitude, angular_momentum, rotation }) {
-  return [r(), r(), r(), r(), r()];
-  // return [velocity.x, velocity.y, altitude, angular_momentum, rotation];
-}
-
-function getFitnessScore(status) {
-  return 100 - getSpeed(status) - Math.abs(status.angular_momentum) * 10;
-}
-
-function getAction([rotateLeft, rotateRight, throttleOn]) {
-  const rotate = rotateLeft > 0.5 ? -1 : rotateRight > 0.5 ? 1 : 0;
-  const thrust = throttleOn > 0.5 ? 1 : 0;
-  return { rotate, thrust };
-}
-
-/*function runSimulation(network) {
-  return new Promise((resolve) => {
-    const gameLoop = setInterval(async () => {
-      // TODO: I could wait until this genome index is ready
-
-      const status = await getStatus();
-      if (status.landed === 0) {
-        const input = getInput(status);
-        // console.log('input', input);
-        const prediction = network.predict(input);
-        console.log(
-          'input',
-          input,
-          'prediction',
-          prediction,
-          'action',
-          getAction(prediction)
-        );
-        const action = { type: 'act', ...getAction(prediction) };
-        sendAction(action);
-      }
-      if (status.landed === 1) {
-        clearInterval(gameLoop);
-        resolve(100);
-      }
-      if (status.landed === -1) {
-        clearInterval(gameLoop);
-        resolve(getFitnessScore(status));
-      }
-    }, 1000 / fps);
-  });
-}*/
-
-// const population = new window.Population(1, 5, 3, false);
-
-// population.evolve(1, async (genome) => {
-//   const network = genome.generateNetwork();
-//   console.log('Starting genome');
-//   const score = await runSimulation(network);
-//   console.log('Finished genome');
-//   return score;
-// });
-
-/*const population = new window.Population(50, 2, 1, false);
-const xor = [
-  [[0, 0], 0],
-  [[0, 1], 1],
-  [[1, 0], 1],
-  [[1, 1], 0],
-];
-
-population.evolve(1000, (genome) => {
-  const network = genome.generateNetwork();
-  let error = 0;
-  for (const [input, output] of xor) {
-    const [prediction] = network.predict(input);
-    error += Math.abs(prediction - output);
-  }
-  return 1 - error / xor.length;
-});
-
-log('evolved');
-*/
