@@ -1,8 +1,15 @@
 const fps = 10;
 
-engine.startGame({
-  // canvasResizePolicy: 0,
-});
+let id_counter = 128;
+
+const landers = {};
+const memory = {};
+
+const LANDING = 0;
+const LANDED = 1;
+const CRASHED = -1;
+
+engine.startGame();
 
 function sendAction(action) {
   const channel = new MessageChannel();
@@ -10,10 +17,10 @@ function sendAction(action) {
 }
 
 // I could make this generic if needed
-function getStatus() {
+function getStatus(id) {
   return new Promise((resolve, reject) => {
     // This opens up a channel and sends data to Godot function
-    const data = JSON.stringify({ type: 'status' });
+    const data = JSON.stringify({ type: 'status', id });
     const channel = new MessageChannel();
     // For some reason this is required
     channel.port1.onmessageerror = reject;
@@ -27,7 +34,6 @@ function getStatus() {
 // Smart Assist Functions
 
 // Memory
-let lastAlt = 1000;
 let phase = 0;
 
 const max_landing_speed = 5;
@@ -75,7 +81,7 @@ function killVelocity(status) {
         rot_error
       )}, kicking back to first phase. Burn time was: ${timeSinceLastBurn}`
     );
-    phase = 0;
+    memory[status.id].phase = 0;
     return nothing;
   } else {
     if (getSpeed(status) > max_landing_speed) {
@@ -85,7 +91,7 @@ function killVelocity(status) {
         thrust: 1,
       };
     } else {
-      phase = 2;
+      memory[status.id].phase = 2;
       log('killed velocity. burned for', timeSinceLastBurn, 'millis');
       return nothing;
     }
@@ -97,7 +103,7 @@ function orientForLanding(status) {
 
   if (status.altitude < danger_altitude && getSpeed(status) > 7) {
     log('Was in danger of crash, kicking back to killing velocity');
-    phase = 1;
+    memory[status.id].phase = 1;
     return nothing;
   }
 
@@ -112,7 +118,7 @@ function orientForLanding(status) {
   }
 
   if (status.altitude < hit_the_brakes_altitude) {
-    phase = 1;
+    memory[status.id].phase = 1;
     return nothing;
   }
 
@@ -128,7 +134,7 @@ function orientToKillAngle(status) {
 
   if (status.altitude < danger_altitude && speed > 7) {
     log('Was in danger of crash, kicking back to killing velocity');
-    phase = 1;
+    memory[status.id].phase = 1;
     return nothing;
   }
 
@@ -144,18 +150,18 @@ function orientToKillAngle(status) {
   }
 
   log('done orienting');
-  phase = 1;
+  memory[status.id].phase = 1;
   return nothing;
 }
 
 function landingAssist(status) {
-  if (phase === 0) {
+  if (memory[status.id].phase === 0) {
     return orientToKillAngle(status);
   }
-  if (phase === 1) {
+  if (memory[status.id].phase === 1) {
     return killVelocity(status);
   }
-  if (phase === 2) {
+  if (memory[status.id].phase === 2) {
     return orientForLanding(status);
   }
   return nothing;
@@ -177,10 +183,11 @@ const PhaseDescriptions = {
   // 3: 'Slowing Down',
 };
 
-async function tick() {
-  const status = await getStatus();
+async function tick(id) {
+  const status = await getStatus(id);
+
   if (status.landed === 0) {
-    const action = { type: 'act', ...landingAssist(status) };
+    const action = { type: 'act', id, ...landingAssist(status) };
     sendAction(action);
     document.getElementById('status').innerHTML =
       PhaseDescriptions[phase] +
@@ -192,10 +199,11 @@ async function tick() {
       getKillVelocityAngleError(status);
   }
   if (status.landed === 1) {
+    landers[id] = LANDED;
     document.getElementById('status').innerHTML = 'Landed';
-    console.log('Fitness score: 100');
   }
   if (status.landed === -1) {
+    landers[id] = CRASHED;
     log(
       'Crashed while',
       PhaseDescriptions[phase],
@@ -204,23 +212,22 @@ async function tick() {
       ' with an angular momentum of',
       Math.abs(status.angular_momentum)
     );
-    console.log(
-      'Fitness Score',
-      100 - getSpeed(status) - Math.abs(status.angular_momentum) * 10
-    );
     document.getElementById('status').innerHTML = 'Crashed';
   }
 }
 
+// TODO: I do not think I will use this
 function reset(
+  id,
   initial_velocity = 100,
   initial_rotation = -Math.PI / 2,
   gravity_amount = 10,
   initial_spin = -1
 ) {
-  phase = 0;
+  memory[id].phase = 0;
   sendAction({
     type: 'reset',
+    id,
     initial_velocity,
     initial_rotation,
     gravity_amount,
@@ -228,7 +235,21 @@ function reset(
   });
 }
 
-setInterval(tick, 1000 / 10);
+function add() {
+  const id = '' + id_counter;
+  sendAction({ type: 'create', id, x: -436, y: -219 });
+  landers[id] = LANDING;
+  memory[id] = { phase: 0 };
+  id_counter += 1;
+}
+
+function gameLoop() {
+  for (let id in landers) {
+    tick(id);
+  }
+}
+
+setInterval(gameLoop, 1000 / fps);
 
 // TODO: Before I can create the AI, I should refactor the smart assist to handle ALL of these scenarios
 
@@ -237,9 +258,9 @@ setInterval(tick, 1000 / 10);
 // - Negate initial spin if any
 // - High gravity is failing b/c "Kill Velocity" function is prioritizing orientation correctness over reducing speed
 
-const s1 = () => reset();
-const s2 = () => reset(100, -Math.PI / 2, 20, 0);
-const s3 = () => reset(100, -Math.PI / 2, 10, 5);
+const s1 = () => reset(128);
+const s2 = () => reset(128, 100, -Math.PI / 2, 20, 0);
+const s3 = () => reset(128, 100, -Math.PI / 2, 10, 5);
 
 // AI Version here....
 

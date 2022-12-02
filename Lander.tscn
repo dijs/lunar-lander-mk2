@@ -1,0 +1,122 @@
+[gd_scene load_steps=45 format=2]
+
+[ext_resource path="res://Lander.gd" type="Script" id=1]
+[ext_resource path="res://Lunar Lander.png" type="Texture" id=2]
+[ext_resource path="res://Flame1Loop/0016.png" type="Texture" id=3]
+[ext_resource path="res://explosion-6.png" type="Texture" id=4]
+[ext_resource path="res://Flame1Loop/0019.png" type="Texture" id=5]
+[ext_resource path="res://Flame1Loop/0018.png" type="Texture" id=6]
+[ext_resource path="res://Flame1Loop/0020.png" type="Texture" id=7]
+[ext_resource path="res://Flame1Loop/0021.png" type="Texture" id=8]
+[ext_resource path="res://Flame1Loop/0023.png" type="Texture" id=9]
+[ext_resource path="res://Flame1Loop/0025.png" type="Texture" id=10]
+[ext_resource path="res://Flame1Loop/0028.png" type="Texture" id=11]
+[ext_resource path="res://Flame1Loop/0029.png" type="Texture" id=12]
+[ext_resource path="res://Flame1Loop/0024.png" type="Texture" id=13]
+[ext_resource path="res://Flame1Loop/0026.png" type="Texture" id=14]
+[ext_resource path="res://Flame1Loop/0027.png" type="Texture" id=15]
+[ext_resource path="res://Flame1Loop/0022.png" type="Texture" id=16]
+[ext_resource path="res://Flame1Loop/0017.png" type="Texture" id=17]
+[ext_resource path="res://Flame1Loop/0002.png" type="Texture" id=18]
+[ext_resource path="res://Flame1Loop/0001.png" type="Texture" id=19]
+[ext_resource path="res://Flame1Loop/0000.png" type="Texture" id=20]
+[ext_resource path="res://Flame1Loop/0008.png" type="Texture" id=21]
+[ext_resource path="res://Flame1Loop/0009.png" type="Texture" id=22]
+[ext_resource path="res://Flame1Loop/0010.png" type="Texture" id=23]
+[ext_resource path="res://Flame1Loop/0011.png" type="Texture" id=24]
+[ext_resource path="res://Flame1Loop/0007.png" type="Texture" id=25]
+[ext_resource path="res://Flame1Loop/0006.png" type="Texture" id=26]
+[ext_resource path="res://Flame1Loop/0003.png" type="Texture" id=27]
+[ext_resource path="res://Flame1Loop/0004.png" type="Texture" id=28]
+[ext_resource path="res://Flame1Loop/0005.png" type="Texture" id=29]
+[ext_resource path="res://Flame1Loop/0012.png" type="Texture" id=30]
+[ext_resource path="res://Flame1Loop/0013.png" type="Texture" id=31]
+[ext_resource path="res://Flame1Loop/0014.png" type="Texture" id=32]
+[ext_resource path="res://Flame1Loop/0015.png" type="Texture" id=33]
+
+[sub_resource type="CircleShape2D" id=1]
+
+[sub_resource type="AtlasTexture" id=13]
+atlas = ExtResource( 4 )
+region = Rect2( 0, 0, 48, 48 )
+
+[sub_resource type="AtlasTexture" id=14]
+atlas = ExtResource( 4 )
+region = Rect2( 48, 0, 48, 48 )
+
+[sub_resource type="AtlasTexture" id=15]
+atlas = ExtResource( 4 )
+region = Rect2( 96, 0, 48, 48 )
+
+[sub_resource type="AtlasTexture" id=16]
+atlas = ExtResource( 4 )
+region = Rect2( 144, 0, 48, 48 )
+
+[sub_resource type="AtlasTexture" id=17]
+atlas = ExtResource( 4 )
+region = Rect2( 192, 0, 48, 48 )
+
+[sub_resource type="AtlasTexture" id=18]
+atlas = ExtResource( 4 )
+region = Rect2( 240, 0, 48, 48 )
+
+[sub_resource type="AtlasTexture" id=19]
+atlas = ExtResource( 4 )
+region = Rect2( 288, 0, 48, 48 )
+
+[sub_resource type="AtlasTexture" id=20]
+atlas = ExtResource( 4 )
+region = Rect2( 336, 0, 48, 48 )
+
+[sub_resource type="SpriteFrames" id=12]
+animations = [ {
+"frames": [ SubResource( 13 ), SubResource( 14 ), SubResource( 15 ), SubResource( 16 ), SubResource( 17 ), SubResource( 18 ), SubResource( 19 ), SubResource( 20 ) ],
+"loop": false,
+"name": "default",
+"speed": 8.0
+} ]
+
+[sub_resource type="SpriteFrames" id=21]
+animations = [ {
+"frames": [ ExtResource( 20 ), ExtResource( 19 ), ExtResource( 18 ), ExtResource( 27 ), ExtResource( 28 ), ExtResource( 29 ), ExtResource( 26 ), ExtResource( 25 ), ExtResource( 21 ), ExtResource( 22 ), ExtResource( 23 ), ExtResource( 24 ), ExtResource( 30 ), ExtResource( 31 ), ExtResource( 32 ), ExtResource( 33 ), ExtResource( 3 ), ExtResource( 17 ), ExtResource( 6 ), ExtResource( 5 ), ExtResource( 7 ), ExtResource( 8 ), ExtResource( 16 ), ExtResource( 9 ), ExtResource( 13 ), ExtResource( 10 ), ExtResource( 14 ), ExtResource( 15 ), ExtResource( 11 ), ExtResource( 12 ) ],
+"loop": true,
+"name": "default",
+"speed": 30.0
+} ]
+
+[node name="Lander" type="KinematicBody2D" groups=["lander"]]
+rotation = -1.5708
+collision_mask = 2
+script = ExtResource( 1 )
+
+[node name="Thrust" type="Line2D" parent="."]
+visible = false
+points = PoolVector2Array( 0, 0, 0, 16 )
+width = 1.0
+default_color = Color( 0.705882, 0.231373, 0.231373, 1 )
+
+[node name="Sprite" type="Sprite" parent="."]
+texture = ExtResource( 2 )
+region_enabled = true
+region_rect = Rect2( -0.537121, 55.1532, 21.035, 23.7913 )
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource( 1 )
+
+[node name="Explosion" type="AnimatedSprite" parent="."]
+visible = false
+rotation = 1.5708
+frames = SubResource( 12 )
+
+[node name="Flames" type="AnimatedSprite" parent="."]
+visible = false
+position = Vector2( 0.283272, 16.7015 )
+rotation = -3.13644
+scale = Vector2( 0.469248, 0.303909 )
+frames = SubResource( 21 )
+
+[node name="RayCast2D" type="RayCast2D" parent="."]
+enabled = true
+
+[node name="RemoveTimer" type="Timer" parent="."]
+one_shot = true
