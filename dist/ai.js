@@ -1,4 +1,4 @@
-const input_node_count = 1;
+const input_node_count = 5;
 const hidden_node_count = 16;
 const output_node_count = 3;
 

@@ -192,8 +192,20 @@ const PhaseDescriptions = {
   2: 'Orienting For Landing',
 };
 
-function getInput({ altitude }) {
-  return [altitude / ground_level];
+function getInput({ altitude, velocity, rotation, x_pos }) {
+  const speed = Math.sqrt(velocity.y ** 2 + velocity.x ** 2);
+  const ux = velocity.x / speed;
+  const uy = velocity.y / speed;
+  // TODO: add rotation and x position
+
+  // Normalize rotation
+  let rot = Math.atan2(Math.sin(rotation), Math.cos(rotation));
+  rot = (rot + Math.PI) / 2;
+
+  // Normalize x position
+  const x = Math.min(1, Math.max(0, x_pos / 500));
+
+  return [altitude / ground_level, ux, uy, rot, x];
 }
 
 function getFitnessScore(status) {
@@ -202,7 +214,7 @@ function getFitnessScore(status) {
     getSpeed(status) -
     Math.abs(status.angular_momentum) * 10 -
     // Make the x position not as important as the other variables
-    status.x_err / 2
+    Math.abs(status.x_pos) / 10
   );
 }
 
@@ -233,7 +245,15 @@ async function tick(id) {
   if (status.landed === -1) {
     landers[id].status = CRASHED;
     landers[id].score = getFitnessScore(status);
-    // console.log(id, 'crashed');
+    const since = Date.now() - landers[id].started;
+    console.log(
+      'Lander #',
+      id,
+      'crashed after',
+      Math.round(since / 1000),
+      'seconds with a score of',
+      landers[id].score
+    );
   }
 }
 
@@ -256,6 +276,14 @@ function init() {
   for (let i = 0; i < generationSize; i++) {
     const id = createLander();
     networks[id] = new NeuralNetwork();
+    // Load best network from local storage
+    networks[id].dispose();
+    let data = localStorage.getItem('best');
+    if (data) {
+      data = JSON.parse(data);
+      networks[id].input_weights = tf.tensor(data.input_weights);
+      networks[id].output_weights = tf.tensor(data.output_weights);
+    }
   }
   started = true;
 }
@@ -285,7 +313,14 @@ function getTopNetworks(n = 3) {
 
 function createLander() {
   const id = '' + id_counter;
-  landers[id] = { id, status: LANDING, phase: 0, score: 0, gen: generation };
+  landers[id] = {
+    id,
+    status: LANDING,
+    phase: 0,
+    score: 0,
+    gen: generation,
+    started: Date.now(),
+  };
   sendAction({ type: 'create', id, x: -436, y: -219 });
   id_counter += 1;
   return id;
@@ -299,8 +334,18 @@ function createNextGeneration() {
     top = top.sort(byScore).slice(0, 3);
   }
 
+  // Update last best
   lastBestNetwork = top[0].network.clone();
   lastBestScore = top[0].score;
+
+  // Save best to local storage
+  localStorage.setItem(
+    'best',
+    JSON.stringify({
+      input_weights: lastBestNetwork.input_weights.arraySync(),
+      output_weights: lastBestNetwork.output_weights.arraySync(),
+    })
+  );
 
   // Update chart
   data[0].push(generation);

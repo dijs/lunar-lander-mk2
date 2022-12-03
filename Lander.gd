@@ -5,7 +5,7 @@ export var initial_velocity = Vector2.RIGHT * 100
 export var initial_rotation = -PI / 2
 export var gravity_pull = Vector2.DOWN * 5
 export var initial_spin = 0
-export var initial_fuel = 20
+export var initial_fuel = 10
 
 export var max_thrust = 50
 export var spin_amount = 3
@@ -40,7 +40,7 @@ func get_status():
 			"x": velocity.x,
 			"y": velocity.y
 		},
-		"x_err": abs(global_position.x),
+		"x_pos": global_position.x,
 		"angular_momentum": spin,
 		"rotation": rotation + PI / 2,
 		"altitude": ground_level - global_position.y,
