@@ -9,7 +9,7 @@ const LANDED = 1;
 const CRASHED = -1;
 
 const ground_level = 114;
-const generationSize = 3 * 7; // Must be a mulitple of 3
+const generationSize = 3 * 20; // Must be a mulitple of 3
 
 let generation = 1;
 let networks = {};
@@ -205,16 +205,28 @@ function getInput({ altitude, velocity, rotation, x_pos }) {
   // Normalize x position
   const x = Math.min(1, Math.max(0, x_pos / 500));
 
-  return [altitude / ground_level, ux, uy, rot, x];
+  return [
+    altitude / ground_level,
+    // ux,
+    // uy,
+    rot,
+    x,
+    speed / 1000,
+  ];
 }
 
 function getFitnessScore(status) {
+  // const speed = Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
+
+  // console.log(speed);
+
   return (
     100 -
     getSpeed(status) -
-    Math.abs(status.angular_momentum) * 10 -
+    Math.abs(status.angular_momentum) * 5 -
     // Make the x position not as important as the other variables
-    Math.abs(status.x_pos) / 10
+    Math.abs(status.x_pos) / 5 -
+    Math.abs(Math.PI / 2 - status.rotation)
   );
 }
 
@@ -277,9 +289,9 @@ function init() {
     const id = createLander();
     networks[id] = new NeuralNetwork();
     // Load best network from local storage
-    networks[id].dispose();
     let data = localStorage.getItem('best');
     if (data) {
+      networks[id].dispose();
       data = JSON.parse(data);
       networks[id].input_weights = tf.tensor(data.input_weights);
       networks[id].output_weights = tf.tensor(data.output_weights);
@@ -356,8 +368,19 @@ function createNextGeneration() {
   generation++;
   const nextGenerationNetworks = {};
 
+  const half = Math.floor(generationSize / 2);
+
+  for (let i = 0; i < half; i++) {
+    const id = createLander();
+    nextGenerationNetworks[id] = mutateNeuralNetwork(top[0].network);
+  }
+  for (let i = half; i < generationSize; i++) {
+    const id = createLander();
+    nextGenerationNetworks[id] = mutateNeuralNetwork(top[1].network);
+  }
+
   // First section mutated from A
-  const third = Math.floor(generationSize / 3);
+  /*const third = Math.floor(generationSize / 3);
   for (let i = 0; i < third; i++) {
     const id = createLander();
     nextGenerationNetworks[id] = mutateNeuralNetwork(top[0].network);
@@ -377,7 +400,7 @@ function createNextGeneration() {
       top[0].network,
       mutateNeuralNetwork(top[2].network)
     );
-  }
+  }*/
 
   // Clean up previous generation networks
   for (let id in networks) {

@@ -1,5 +1,5 @@
-const input_node_count = 5;
-const hidden_node_count = 16;
+const input_node_count = 4;
+const hidden_node_count = 24;
 const output_node_count = 3;
 
 let previous = false;
@@ -83,18 +83,6 @@ class NeuralNetwork {
     this.output_weights.dispose();
   }
 }
-
-// How to train...
-
-// * Keep track of generation
-// * Each lander will have a network
-
-// 0. Create initial generation of random landers
-// 1. Play the game (need to figure out how to determine when all landers have finished)
-// 2. Let the landers finish the simulation
-// 3. Sort landers by best fitness
-// 4. Create new generation by mutating the best lander
-// 5. Go to #1
 
 function fn(x) {
   if (random(1) < 0.05) {
