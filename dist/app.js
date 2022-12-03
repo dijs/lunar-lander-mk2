@@ -9,7 +9,7 @@ const LANDED = 1;
 const CRASHED = -1;
 
 const ground_level = 114;
-const generationSize = 32;
+const generationSize = 8;
 
 let generation = 1;
 let networks = {};
@@ -233,14 +233,14 @@ async function tick(id) {
   if (status.landed === -1) {
     landers[id].status = CRASHED;
     landers[id].score = getFitnessScore(status);
-    console.log(id, 'crashed');
+    // console.log(id, 'crashed');
   }
 }
 
 function addRandomLander() {
   const id = '' + id_counter;
   sendAction({ type: 'create', id, x: -436, y: -219 });
-  landers[id] = { status: LANDING, phase: 0, score: 0, gen: generation };
+  landers[id] = { id, status: LANDING, phase: 0, score: 0, gen: generation };
   networks[id] = new NeuralNetwork();
   id_counter += 1;
 }
@@ -280,6 +280,16 @@ function findBestLanderId() {
   return bestId;
 }
 
+const byScore = (a, b) => b.score - a.score;
+
+function getTopLanders(n = 3) {
+  return Object.keys(networks)
+    .map((id) => ({ ...landers[id] }))
+    .sort(byScore)
+    .slice(0, n)
+    .map(({ id, score }) => ({ id, score }));
+}
+
 // TODO:
 // Implementing a crossover method so instead of mutating
 // only 1 of the best games, we take 2 of the best games
@@ -289,7 +299,7 @@ function findBestLanderId() {
 // TODO: Make a generic createChild method
 function createMutatedChild(network) {
   const id = '' + id_counter;
-  landers[id] = { status: LANDING, phase: 0, score: 0, gen: generation };
+  landers[id] = { id, status: LANDING, phase: 0, score: 0, gen: generation };
   const child = mutateNeuralNetwork(network);
   sendAction({ type: 'create', id, x: -436, y: -219 });
   id_counter += 1;
@@ -298,7 +308,7 @@ function createMutatedChild(network) {
 
 function createCrossoverChild(networkA, networkB) {
   const id = '' + id_counter;
-  landers[id] = { status: LANDING, phase: 0, score: 0, gen: generation };
+  landers[id] = { id, status: LANDING, phase: 0, score: 0, gen: generation };
   const child = crossoverNeuralNetwork(networkA, networkB);
   sendAction({ type: 'create', id, x: -436, y: -219 });
   id_counter += 1;
@@ -306,6 +316,11 @@ function createCrossoverChild(networkA, networkB) {
 }
 
 function createNextGeneration() {
+  // TODO: Find top 3
+  const top = getTopLanders();
+  console.log(JSON.stringify(top, null, 3));
+  ///
+
   const bestId = findBestLanderId();
   let bestNetwork = networks[bestId];
 
@@ -389,3 +404,5 @@ let opts = {
 };
 
 let uplot = new uPlot(opts, data, document.body);
+
+setTimeout(init, 1000);
