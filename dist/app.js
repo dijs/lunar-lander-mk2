@@ -9,11 +9,13 @@ const LANDED = 1;
 const CRASHED = -1;
 
 const ground_level = 114;
-const generationSize = 32;
+const generationSize = 16;
 
 let generation = 1;
 let networks = {};
 let started = false;
+let lastBestScore = 0;
+let lastBestNetwork = null;
 
 ////////////////////////////////////////////////////////////
 
@@ -301,7 +303,7 @@ function init() {
   started = true;
 }
 
-function findBestNetwork() {
+function findBestLanderId() {
   let bestId = 0;
   let bestScore = -100000;
   for (let id in landers) {
@@ -311,18 +313,30 @@ function findBestNetwork() {
     }
   }
   console.log('Best lander was', bestId, 'with a score of', bestScore);
-  return networks[bestId];
+  return bestId;
 }
 
 function createNextGeneration() {
-  const best = findBestNetwork();
+  const bestId = findBestLanderId();
+  let bestNetwork = networks[bestId];
+
+  // Check if last best was better than current best
+  if (lastBestNetwork && lastBestScore > landers[bestId].score) {
+    console.log('Using last best');
+    bestNetwork = lastBestNetwork;
+  } else {
+    console.log('Found better');
+    lastBestNetwork = bestNetwork.clone();
+    lastBestScore = landers[bestId].score;
+  }
+
   generation++;
   const nextGenerationNetworks = {};
 
   for (let i = 0; i < generationSize; i++) {
     const id = '' + id_counter;
     landers[id] = { status: LANDING, phase: 0, score: 0, gen: generation };
-    nextGenerationNetworks[id] = mutateNeuralNetwork(best);
+    nextGenerationNetworks[id] = mutateNeuralNetwork(bestNetwork);
     sendAction({ type: 'create', id, x: -436, y: -219 });
     id_counter += 1;
   }
