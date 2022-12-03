@@ -118,3 +118,31 @@ function mutateNeuralNetwork(b) {
   neuralNetwork.output_weights = tf.tensor(ho, ho_shape);
   return neuralNetwork;
 }
+
+function crossoverNeuralNetwork(neuralNetworkOne, neuralNetworkTwo) {
+  let parentA_in_dna = neuralNetworkOne.input_weights.dataSync();
+  let parentA_out_dna = neuralNetworkOne.output_weights.dataSync();
+  let parentB_in_dna = neuralNetworkTwo.input_weights.dataSync();
+  let parentB_out_dna = neuralNetworkTwo.output_weights.dataSync();
+
+  let mid = Math.floor(Math.random() * parentA_in_dna.length);
+  let child_in_dna = [
+    ...parentA_in_dna.slice(0, mid),
+    ...parentB_in_dna.slice(mid, parentB_in_dna.length),
+  ];
+  let child_out_dna = [
+    ...parentA_out_dna.slice(0, mid),
+    ...parentB_out_dna.slice(mid, parentB_out_dna.length),
+  ];
+
+  let child = neuralNetworkOne.clone();
+  let input_shape = neuralNetworkOne.input_weights.shape;
+  let output_shape = neuralNetworkOne.output_weights.shape;
+
+  child.dispose();
+
+  child.input_weights = tf.tensor(child_in_dna, input_shape);
+  child.output_weights = tf.tensor(child_out_dna, output_shape);
+
+  return child;
+}

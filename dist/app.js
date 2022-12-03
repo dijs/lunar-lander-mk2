@@ -9,7 +9,7 @@ const LANDED = 1;
 const CRASHED = -1;
 
 const ground_level = 114;
-const generationSize = 16;
+const generationSize = 32;
 
 let generation = 1;
 let networks = {};
@@ -201,7 +201,8 @@ function getFitnessScore(status) {
     100 -
     getSpeed(status) -
     Math.abs(status.angular_momentum) * 10 -
-    status.x_err
+    // Make the x position not as important as the other variables
+    status.x_err / 2
   );
 }
 
@@ -223,54 +224,17 @@ async function tick(id) {
     // const action = { type: 'act', id, ...landingAssist(status) };
     const action = { type: 'act', id, ...machineLandingAssist(status) };
     sendAction(action);
-    document.getElementById('status').innerHTML =
-      PhaseDescriptions[phase] +
-      ' | AM:' +
-      status.angular_momentum +
-      ' | ROT:' +
-      status.rotation +
-      ' | KAE:' +
-      getKillVelocityAngleError(status);
   }
   if (status.landed === 1) {
     landers[id].status = LANDED;
     landers[id].score = 100;
-    document.getElementById('status').innerHTML = 'Landed';
     console.log(id, 'landed');
   }
   if (status.landed === -1) {
     landers[id].status = CRASHED;
-    console.log(id, 'crashed');
     landers[id].score = getFitnessScore(status);
-    log(
-      'Crashed while',
-      PhaseDescriptions[phase],
-      ' at a speed of',
-      getSpeed(status),
-      ' with an angular momentum of',
-      Math.abs(status.angular_momentum)
-    );
-    document.getElementById('status').innerHTML = 'Crashed';
+    console.log(id, 'crashed');
   }
-}
-
-// TODO: I do not think I will use this
-function reset(
-  id,
-  initial_velocity = 100,
-  initial_rotation = -Math.PI / 2,
-  gravity_amount = 10,
-  initial_spin = -1
-) {
-  landers[id].phase = 0;
-  sendAction({
-    type: 'reset',
-    id,
-    initial_velocity,
-    initial_rotation,
-    gravity_amount,
-    initial_spin,
-  });
 }
 
 function addRandomLander() {
@@ -316,6 +280,31 @@ function findBestLanderId() {
   return bestId;
 }
 
+// TODO:
+// Implementing a crossover method so instead of mutating
+// only 1 of the best games, we take 2 of the best games
+// and breed a child NeuralNetwork from their 2 results
+// (which is called a crossover)
+
+// TODO: Make a generic createChild method
+function createMutatedChild(network) {
+  const id = '' + id_counter;
+  landers[id] = { status: LANDING, phase: 0, score: 0, gen: generation };
+  const child = mutateNeuralNetwork(network);
+  sendAction({ type: 'create', id, x: -436, y: -219 });
+  id_counter += 1;
+  return child;
+}
+
+function createCrossoverChild(networkA, networkB) {
+  const id = '' + id_counter;
+  landers[id] = { status: LANDING, phase: 0, score: 0, gen: generation };
+  const child = crossoverNeuralNetwork(networkA, networkB);
+  sendAction({ type: 'create', id, x: -436, y: -219 });
+  id_counter += 1;
+  return child;
+}
+
 function createNextGeneration() {
   const bestId = findBestLanderId();
   let bestNetwork = networks[bestId];
@@ -325,20 +314,30 @@ function createNextGeneration() {
     console.log('Using last best');
     bestNetwork = lastBestNetwork;
   } else {
-    console.log('Found better');
+    const improvement = landers[bestId].score - lastBestScore;
+    console.log('Found better by', improvement);
     lastBestNetwork = bestNetwork.clone();
     lastBestScore = landers[bestId].score;
   }
 
+  data[0].push(generation);
+  data[1].push(lastBestScore);
+  uplot.setData(data);
+
   generation++;
   const nextGenerationNetworks = {};
 
-  for (let i = 0; i < generationSize; i++) {
-    const id = '' + id_counter;
-    landers[id] = { status: LANDING, phase: 0, score: 0, gen: generation };
-    nextGenerationNetworks[id] = mutateNeuralNetwork(bestNetwork);
-    sendAction({ type: 'create', id, x: -436, y: -219 });
-    id_counter += 1;
+  // Half mutated
+  const mid = Math.floor(generationSize / 2);
+  for (let i = 0; i < mid; i++) {
+    nextGenerationNetworks[id_counter] = createMutatedChild(bestNetwork);
+  }
+  // Half crossover
+  for (let i = mid; i < generationSize; i++) {
+    nextGenerationNetworks[id_counter] = createCrossoverChild(
+      bestNetwork,
+      lastBestNetwork
+    );
   }
 
   for (let id in networks) {
@@ -348,3 +347,45 @@ function createNextGeneration() {
   networks = nextGenerationNetworks;
   console.log('Started Generation', generation);
 }
+
+let data = [
+  [], // x-values (timestamps)
+  [], // y-values (series 1)
+];
+
+let opts = {
+  width: 400,
+  height: 100,
+  pxAlign: false,
+  cursor: {
+    show: false,
+  },
+  select: {
+    show: false,
+  },
+  legend: {
+    show: false,
+  },
+  scales: {
+    x: {
+      time: false,
+    },
+  },
+  axes: [
+    {
+      show: false,
+    },
+    {
+      show: false,
+    },
+  ],
+  series: [
+    {},
+    {
+      stroke: '#03a9f4',
+      fill: '#b3e5fc',
+    },
+  ],
+};
+
+let uplot = new uPlot(opts, data, document.body);
