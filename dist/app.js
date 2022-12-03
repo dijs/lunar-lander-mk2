@@ -9,7 +9,7 @@ const LANDED = 1;
 const CRASHED = -1;
 
 const ground_level = 114;
-const generationSize = 8;
+const generationSize = 3 * 7; // Must be a mulitple of 3
 
 let generation = 1;
 let networks = {};
@@ -237,14 +237,6 @@ async function tick(id) {
   }
 }
 
-function addRandomLander() {
-  const id = '' + id_counter;
-  sendAction({ type: 'create', id, x: -436, y: -219 });
-  landers[id] = { id, status: LANDING, phase: 0, score: 0, gen: generation };
-  networks[id] = new NeuralNetwork();
-  id_counter += 1;
-}
-
 function gameLoop() {
   let readyForNextGeneration = true;
   for (let id in landers) {
@@ -262,7 +254,8 @@ setInterval(gameLoop, 1000 / fps);
 
 function init() {
   for (let i = 0; i < generationSize; i++) {
-    addRandomLander();
+    const id = createLander();
+    networks[id] = new NeuralNetwork();
   }
   started = true;
 }
@@ -282,85 +275,77 @@ function findBestLanderId() {
 
 const byScore = (a, b) => b.score - a.score;
 
-function getTopLanders(n = 3) {
+function getTopNetworks(n = 3) {
   return Object.keys(networks)
     .map((id) => ({ ...landers[id] }))
     .sort(byScore)
     .slice(0, n)
-    .map(({ id, score }) => ({ id, score }));
+    .map(({ id, score }) => ({ network: networks[id], score }));
 }
 
-// TODO:
-// Implementing a crossover method so instead of mutating
-// only 1 of the best games, we take 2 of the best games
-// and breed a child NeuralNetwork from their 2 results
-// (which is called a crossover)
-
-// TODO: Make a generic createChild method
-function createMutatedChild(network) {
+function createLander() {
   const id = '' + id_counter;
   landers[id] = { id, status: LANDING, phase: 0, score: 0, gen: generation };
-  const child = mutateNeuralNetwork(network);
   sendAction({ type: 'create', id, x: -436, y: -219 });
   id_counter += 1;
-  return child;
-}
-
-function createCrossoverChild(networkA, networkB) {
-  const id = '' + id_counter;
-  landers[id] = { id, status: LANDING, phase: 0, score: 0, gen: generation };
-  const child = crossoverNeuralNetwork(networkA, networkB);
-  sendAction({ type: 'create', id, x: -436, y: -219 });
-  id_counter += 1;
-  return child;
+  return id;
 }
 
 function createNextGeneration() {
-  // TODO: Find top 3
-  const top = getTopLanders();
-  console.log(JSON.stringify(top, null, 3));
-  ///
-
-  const bestId = findBestLanderId();
-  let bestNetwork = networks[bestId];
-
-  // Check if last best was better than current best
-  if (lastBestNetwork && lastBestScore > landers[bestId].score) {
-    console.log('Using last best');
-    bestNetwork = lastBestNetwork;
-  } else {
-    const improvement = landers[bestId].score - lastBestScore;
-    console.log('Found better by', improvement);
-    lastBestNetwork = bestNetwork.clone();
-    lastBestScore = landers[bestId].score;
+  // Find current top 3 and add last best
+  let top = getTopNetworks();
+  if (lastBestNetwork) {
+    top.push({ network: lastBestNetwork, score: lastBestScore });
+    top = top.sort(byScore).slice(0, 3);
   }
 
+  lastBestNetwork = top[0].network.clone();
+  lastBestScore = top[0].score;
+
+  // Update chart
   data[0].push(generation);
   data[1].push(lastBestScore);
   uplot.setData(data);
 
+  // Now use these networks to build a new generation
   generation++;
   const nextGenerationNetworks = {};
 
-  // Half mutated
-  const mid = Math.floor(generationSize / 2);
-  for (let i = 0; i < mid; i++) {
-    nextGenerationNetworks[id_counter] = createMutatedChild(bestNetwork);
+  // First section mutated from A
+  const third = Math.floor(generationSize / 3);
+  for (let i = 0; i < third; i++) {
+    const id = createLander();
+    nextGenerationNetworks[id] = mutateNeuralNetwork(top[0].network);
   }
-  // Half crossover
-  for (let i = mid; i < generationSize; i++) {
-    nextGenerationNetworks[id_counter] = createCrossoverChild(
-      bestNetwork,
-      lastBestNetwork
+  // Second section AB crossover
+  for (let i = third; i < third * 2; i++) {
+    const id = createLander();
+    nextGenerationNetworks[id] = crossoverNeuralNetwork(
+      top[0].network,
+      mutateNeuralNetwork(top[1].network)
+    );
+  }
+  // Third section AC crossover
+  for (let i = third * 2; i < generationSize; i++) {
+    const id = createLander();
+    nextGenerationNetworks[id] = crossoverNeuralNetwork(
+      top[0].network,
+      mutateNeuralNetwork(top[2].network)
     );
   }
 
+  // Clean up previous generation networks
   for (let id in networks) {
     networks[id].dispose();
   }
 
   networks = nextGenerationNetworks;
-  console.log('Started Generation', generation);
+  console.log(
+    'Started Generation',
+    generation,
+    'Best score was',
+    lastBestScore
+  );
 }
 
 let data = [
