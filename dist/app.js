@@ -1,8 +1,8 @@
 document.body.style.backgroundColor = 'black';
 
-const fps = 10;
+const fps = 2;
 
-let id_counter = 128;
+let id_counter = 1;
 
 const landers = {};
 
@@ -12,6 +12,13 @@ const CRASHED = -1;
 
 const ground_level = 114;
 const generationSize = 3 * 33; // Must be a mulitple of 3
+
+const actions = [
+  { rotate: 0, thrust: 0 },
+  { rotate: 0, thrust: 1 },
+  { rotate: 1, thrust: 0 },
+  { rotate: -1, thrust: 0 },
+];
 
 let generation = 1;
 let networks = {};
@@ -38,8 +45,10 @@ function getStatus(id) {
     channel.port1.onmessageerror = reject;
     channel.port1.addEventListener('message', (message) => {
       resolve(JSON.parse(message.data));
+      channel.port1.close();
     });
     postMessage(data, '*', [channel.port2]);
+    channel.port2.close();
   });
 }
 
@@ -88,23 +97,15 @@ function getSpeed(status) {
 }
 
 function getFitnessScore(status) {
-  // const speed = Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
-  // console.log(speed);
-
   return (
     100 -
     getSpeed(status) -
     Math.abs(status.angular_momentum) * 3 -
     // Math.abs(Math.PI / 2 - status.rotation) * 10 -
     // Make the x position not as important as the other variables
-    Math.abs(status.x_pos) / 10
+    Math.abs(status.x_pos) / 10 -
+    landers[status.id].count
   );
-}
-
-function getRotate(x, y) {
-  if (x < 0.5 && y < 0.5) return 0;
-  if (x >= y) return 1;
-  return -1;
 }
 
 function getActionIndex(outputs) {
@@ -121,21 +122,13 @@ function getActionIndex(outputs) {
   return maxIndex;
 }
 
-const actions = [
-  { rotate: 0, thrust: 0 },
-  { rotate: 0, thrust: 1 },
-  { rotate: 1, thrust: 0 },
-  { rotate: -1, thrust: 0 },
-];
-
-// These are discrete actions
-function getAction(outputs) {
-  return actions[getActionIndex(outputs)];
-}
-
 function machineLandingAssist(status) {
-  let outputs = networks[status.id].predict(getInput(status));
-  return getAction(outputs);
+  const outputs = networks[status.id].predict(getInput(status));
+  const actionIndex = getActionIndex(outputs);
+  if (actionIndex > 0) {
+    landers[status.id].count++;
+  }
+  return actions[actionIndex];
 }
 
 async function tick(id) {
@@ -167,7 +160,10 @@ async function tick(id) {
       ',ang mom',
       Math.round(status.angular_momentum),
       ',x',
-      Math.round(status.x_pos)
+      Math.round(status.x_pos),
+      ' | used',
+      landers[id].count,
+      'actions'
     );
   }
 }
@@ -237,6 +233,7 @@ function createLander() {
     status: LANDING,
     phase: 0,
     score: 0,
+    count: 0,
     gen: generation,
     started: Date.now(),
   };
@@ -244,8 +241,6 @@ function createLander() {
   id_counter += 1;
   return id;
 }
-
-// TODO: each action should cost points (that way we can train the network to value less actions over more...)
 
 function createNextGeneration() {
   // Find current top 3 and add last best
@@ -276,23 +271,10 @@ function createNextGeneration() {
   generation++;
   const nextGenerationNetworks = {};
 
-  // const half = Math.floor(generationSize / 2);
-
-  // for (let i = 0; i < generationSize; i++) {
-  //   const id = createLander();
-  //   nextGenerationNetworks[id] = mutateNeuralNetwork(top[0].network);
-  // }
-
   // Decay learning rate
-  // learningRate *= decayRate;
-  // document.querySelector('#learning-rate').value = learningRate;
-
-  // console.log('Learning rate set to', learningRate);
-
-  // for (let i = half; i < generationSize; i++) {
-  //   const id = createLander();
-  //   nextGenerationNetworks[id] = mutateNeuralNetwork(top[1].network);
-  // }
+  learningRate *= decayRate;
+  document.querySelector('#learning-rate').value = learningRate;
+  console.log('Learning rate set to', learningRate);
 
   // First section mutated from A
   const third = Math.floor(generationSize / 3);
