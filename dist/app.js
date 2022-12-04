@@ -68,27 +68,28 @@ function getLanderCount() {
   });
 }
 
+// (Continuous): X distance from target site
+// (Continuous): Y distance from target site
+// (Continuous): X velocity
+// (Continuous): Y velocity
+// (Continuous): Angle of ship
+// (Continuous): Angular velocity of ship
+// (Binary): Left leg is grounded
+// (Binary): Right leg is grounded
+
+function normalizeAngle(a) {
+  let rot = Math.atan2(Math.sin(a), Math.cos(a));
+  return (rot + Math.PI) / 2;
+}
+
 function getInput({ altitude, velocity, rotation, x_pos, angular_momentum }) {
-  const speed = Math.sqrt(velocity.y ** 2 + velocity.x ** 2);
-  const ux = velocity.x / speed;
-  const uy = velocity.y / speed;
-  // TODO: add rotation and x position
-
-  // Normalize rotation
-  let rot = Math.atan2(Math.sin(rotation), Math.cos(rotation));
-  rot = (rot + Math.PI) / 2;
-
-  // Normalize x position
-  const x = x_pos / 500;
-
   return [
-    altitude / ground_level,
-    ux,
-    uy,
-    rot,
-    x,
-    speed / 300,
-    angular_momentum / 100,
+    x_pos,
+    altitude - ground_level,
+    velocity.x,
+    velocity.y,
+    normalizeAngle(rotation),
+    angular_momentum,
   ];
 }
 
@@ -104,7 +105,7 @@ function getFitnessScore(status) {
     // Math.abs(Math.PI / 2 - status.rotation) * 10 -
     // Make the x position not as important as the other variables
     Math.abs(status.x_pos) / 10 -
-    landers[status.id].count
+    landers[status.id].count / 4
   );
 }
 
@@ -364,3 +365,6 @@ document.querySelector('#learning-rate').addEventListener('change', (e) => {
 document.querySelector('#mutate-threshold').addEventListener('change', (e) => {
   mutateThreshold = parseFloat(e.currentTarget.value);
 });
+
+document.querySelector('#learning-rate').value = learningRate;
+document.querySelector('#mutate-threshold').value = mutateThreshold;

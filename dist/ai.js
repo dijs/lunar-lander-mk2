@@ -1,10 +1,10 @@
-const input_node_count = 7;
+const input_node_count = 6;
 const output_node_count = 4;
-const decayRate = 0.9;
+const decayRate = 0.95;
 
 let previous = false;
 
-let learningRate = 0.05;
+let learningRate = 0.3;
 let mutateThreshold = 0.1;
 
 const random = (min, max) => {
@@ -69,7 +69,8 @@ class NeuralNetwork {
       const hidden_layer1 = input_layer.matMul(this.weights[0]).relu();
       // const hidden_layer2 = hidden_layer1.matMul(this.weights[1]).sigmoid();
       // const hidden_layer3 = hidden_layer2.matMul(this.weights[2]).sigmoid();
-      const output_layer = hidden_layer1.matMul(this.weights[1]).relu();
+      // TODO: Try softmax for output
+      const output_layer = hidden_layer1.matMul(this.weights[1]).softmax();
       output = output_layer.dataSync();
     });
     return output;
