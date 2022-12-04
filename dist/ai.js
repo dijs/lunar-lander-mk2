@@ -1,8 +1,8 @@
 const input_node_count = 4;
-const hidden_node_count = 24;
 const output_node_count = 3;
 
 let previous = false;
+let learningRate = 0.5;
 
 const random = (min, max) => {
   var rand;
@@ -23,7 +23,6 @@ const random = (min, max) => {
       min = max;
       max = tmp;
     }
-
     return rand * (max - min) + min;
   }
 };
@@ -52,19 +51,22 @@ const randomGaussian = (mean, sd) => {
 
 class NeuralNetwork {
   constructor() {
-    // Initialize random weights
-    this.input_weights = tf.randomNormal([input_node_count, hidden_node_count]);
-    this.output_weights = tf.randomNormal([
-      hidden_node_count,
-      output_node_count,
-    ]);
+    this.weights = [
+      tf.randomNormal([input_node_count, 32]),
+      tf.randomNormal([32, 16]),
+      tf.randomNormal([16, 8]),
+      tf.randomNormal([8, output_node_count]),
+    ];
   }
   predict(user_input) {
     let output;
+    // TODO: Build this with a better TS way...
     tf.tidy(() => {
       const input_layer = tf.tensor(user_input, [1, input_node_count]);
-      const hidden_layer = input_layer.matMul(this.input_weights).sigmoid();
-      const output_layer = hidden_layer.matMul(this.output_weights).sigmoid();
+      const hidden_layer1 = input_layer.matMul(this.weights[0]).sigmoid();
+      const hidden_layer2 = hidden_layer1.matMul(this.weights[1]).sigmoid();
+      const hidden_layer3 = hidden_layer2.matMul(this.weights[2]).sigmoid();
+      const output_layer = hidden_layer3.matMul(this.weights[3]).sigmoid();
       output = output_layer.dataSync();
     });
     return output;
@@ -73,20 +75,20 @@ class NeuralNetwork {
     return tf.tidy(() => {
       let clonie = new NeuralNetwork();
       clonie.dispose();
-      clonie.input_weights = tf.clone(this.input_weights);
-      clonie.output_weights = tf.clone(this.output_weights);
+      clonie.weights = this.weights.map((w) => tf.clone(w));
       return clonie;
     });
   }
   dispose() {
-    this.input_weights.dispose();
-    this.output_weights.dispose();
+    for (let w of this.weights) {
+      w.dispose();
+    }
   }
 }
 
 function fn(x) {
   if (random(1) < 0.05) {
-    let offset = randomGaussian() * 0.5;
+    let offset = randomGaussian() * learningRate;
     let newx = x + offset;
     return newx;
   }
@@ -95,15 +97,13 @@ function fn(x) {
 
 function mutateNeuralNetwork(b) {
   let neuralNetwork = b.clone();
-  let ih = neuralNetwork.input_weights.dataSync().map(fn);
-  let ih_shape = neuralNetwork.input_weights.shape;
-  neuralNetwork.input_weights.dispose();
-  neuralNetwork.input_weights = tf.tensor(ih, ih_shape);
 
-  let ho = neuralNetwork.output_weights.dataSync().map(fn);
-  let ho_shape = neuralNetwork.output_weights.shape;
-  neuralNetwork.output_weights.dispose();
-  neuralNetwork.output_weights = tf.tensor(ho, ho_shape);
+  neuralNetwork.weights = neuralNetwork.weights.map((layer) => {
+    const tensor = tf.tensor(layer.dataSync().map(fn), layer.shape);
+    layer.dispose();
+    return tensor;
+  });
+
   return neuralNetwork;
 }
 

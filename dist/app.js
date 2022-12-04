@@ -262,9 +262,9 @@ async function tick(id) {
       'Lander #',
       id,
       'crashed after',
-      Math.round(since / 1000),
-      'seconds with a score of',
-      landers[id].score
+      Math.round(since / 1000)
+      // 'seconds with a score of',
+      // landers[id].score
     );
   }
 }
@@ -293,8 +293,7 @@ function init() {
     if (data) {
       networks[id].dispose();
       data = JSON.parse(data);
-      networks[id].input_weights = tf.tensor(data.input_weights);
-      networks[id].output_weights = tf.tensor(data.output_weights);
+      networks[id].weights = data.weights.map((w) => tf.tensor(w));
     }
   }
   started = true;
@@ -354,8 +353,7 @@ function createNextGeneration() {
   localStorage.setItem(
     'best',
     JSON.stringify({
-      input_weights: lastBestNetwork.input_weights.arraySync(),
-      output_weights: lastBestNetwork.output_weights.arraySync(),
+      weights: lastBestNetwork.weights.map((w) => w.arraySync()),
     })
   );
 
@@ -368,16 +366,22 @@ function createNextGeneration() {
   generation++;
   const nextGenerationNetworks = {};
 
-  const half = Math.floor(generationSize / 2);
+  // const half = Math.floor(generationSize / 2);
 
-  for (let i = 0; i < half; i++) {
+  for (let i = 0; i < generation; i++) {
     const id = createLander();
     nextGenerationNetworks[id] = mutateNeuralNetwork(top[0].network);
   }
-  for (let i = half; i < generationSize; i++) {
-    const id = createLander();
-    nextGenerationNetworks[id] = mutateNeuralNetwork(top[1].network);
-  }
+
+  // Decay learning rate
+  learningRate *= 0.95;
+
+  console.log('Learning rate set to', learningRate);
+
+  // for (let i = half; i < generationSize; i++) {
+  //   const id = createLander();
+  //   nextGenerationNetworks[id] = mutateNeuralNetwork(top[1].network);
+  // }
 
   // First section mutated from A
   /*const third = Math.floor(generationSize / 3);

@@ -1,3 +1,4 @@
 dist/*
 !dist/ai.js
 !dist/app.js
+!dist/libs
