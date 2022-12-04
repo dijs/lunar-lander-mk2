@@ -1,10 +1,10 @@
 const input_node_count = 7;
-const output_node_count = 3;
+const output_node_count = 4;
 const decayRate = 0.9;
 
 let previous = false;
 
-let learningRate = 0.5;
+let learningRate = 0.05;
 let mutateThreshold = 0.1;
 
 const random = (min, max) => {
@@ -55,10 +55,10 @@ const randomGaussian = (mean, sd) => {
 class NeuralNetwork {
   constructor() {
     this.weights = [
-      tf.randomNormal([input_node_count, 128]),
+      tf.randomNormal([input_node_count, 256]),
       // tf.randomNormal([32, 16]),
       // tf.randomNormal([16, 8]),
-      tf.randomNormal([128, output_node_count]),
+      tf.randomNormal([256, output_node_count]),
     ];
   }
   predict(user_input) {
@@ -66,10 +66,10 @@ class NeuralNetwork {
     // TODO: Build this with a better TS way...
     tf.tidy(() => {
       const input_layer = tf.tensor(user_input, [1, input_node_count]);
-      const hidden_layer1 = input_layer.matMul(this.weights[0]).sigmoid();
+      const hidden_layer1 = input_layer.matMul(this.weights[0]).relu();
       // const hidden_layer2 = hidden_layer1.matMul(this.weights[1]).sigmoid();
       // const hidden_layer3 = hidden_layer2.matMul(this.weights[2]).sigmoid();
-      const output_layer = hidden_layer1.matMul(this.weights[1]).sigmoid();
+      const output_layer = hidden_layer1.matMul(this.weights[1]).relu();
       output = output_layer.dataSync();
     });
     return output;
@@ -119,10 +119,10 @@ function mutateNeuralNetwork(b) {
 }
 
 function crossoverNeuralNetwork(neuralNetworkOne, neuralNetworkTwo) {
-  let parentA_in_dna = neuralNetworkOne.input_weights.dataSync();
-  let parentA_out_dna = neuralNetworkOne.output_weights.dataSync();
-  let parentB_in_dna = neuralNetworkTwo.input_weights.dataSync();
-  let parentB_out_dna = neuralNetworkTwo.output_weights.dataSync();
+  let parentA_in_dna = neuralNetworkOne.weights[0].dataSync();
+  let parentA_out_dna = neuralNetworkOne.weights[1].dataSync();
+  let parentB_in_dna = neuralNetworkTwo.weights[0].dataSync();
+  let parentB_out_dna = neuralNetworkTwo.weights[1].dataSync();
 
   let mid = Math.floor(Math.random() * parentA_in_dna.length);
   let child_in_dna = [
@@ -135,13 +135,13 @@ function crossoverNeuralNetwork(neuralNetworkOne, neuralNetworkTwo) {
   ];
 
   let child = neuralNetworkOne.clone();
-  let input_shape = neuralNetworkOne.input_weights.shape;
-  let output_shape = neuralNetworkOne.output_weights.shape;
+  let input_shape = neuralNetworkOne.weights[0].shape;
+  let output_shape = neuralNetworkOne.weights[1].shape;
 
   child.dispose();
 
-  child.input_weights = tf.tensor(child_in_dna, input_shape);
-  child.output_weights = tf.tensor(child_out_dna, output_shape);
+  child.weights[0] = tf.tensor(child_in_dna, input_shape);
+  child.weights[1] = tf.tensor(child_out_dna, output_shape);
 
   return child;
 }

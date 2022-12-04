@@ -19,6 +19,10 @@ func on_js_input(args):
 	var js_event = args[0]
 	var action = JSON.parse(js_event.data).result
 
+	if action.type == "debug":
+		var count = get_tree().get_nodes_in_group("lander")
+		js_event.ports[0].postMessage(count.size())
+
 	if action.type == "create":
 		var e = Lander.instance()
 		e.id = action.id

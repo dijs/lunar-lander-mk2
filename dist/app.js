@@ -11,7 +11,7 @@ const LANDED = 1;
 const CRASHED = -1;
 
 const ground_level = 114;
-const generationSize = 100; // Must be a mulitple of 3
+const generationSize = 3 * 33; // Must be a mulitple of 3
 
 let generation = 1;
 let networks = {};
@@ -43,156 +43,21 @@ function getStatus(id) {
   });
 }
 
-// Smart Assist Functions
-
-// Memory
-let phase = 0;
-
-const max_landing_speed = 5;
-const landing_altitude_threshold = 100;
-const hit_the_brakes_altitude = 100;
-const danger_altitude = 50;
-const landing_rotation_goal = Math.PI / 2;
-const nothing = {
-  rotate: 0,
-  thrust: 0,
-};
-
-function getAllowedRotationSpeed(status) {
-  return status.altitude > landing_altitude_threshold ? 0.3 : 0.1;
+function getLanderCount() {
+  return new Promise((resolve, reject) => {
+    // This opens up a channel and sends data to Godot function
+    const data = JSON.stringify({ type: 'debug' });
+    const channel = new MessageChannel();
+    // For some reason this is required
+    channel.port1.onmessageerror = reject;
+    channel.port1.addEventListener('message', (message) => {
+      resolve(message.data);
+      channel.port1.close();
+    });
+    postMessage(data, '*', [channel.port2]);
+    channel.port2.close();
+  });
 }
-
-function getAllowedRotationError(status) {
-  return status.altitude > landing_altitude_threshold ? 0.1 : 0.5;
-}
-
-function getSpeed(status) {
-  return Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
-}
-
-function getKillVelocityAngleError({ rotation, velocity }) {
-  const speed = Math.sqrt(velocity.y ** 2 + velocity.x ** 2);
-  // TODO: Try another atan2 for the current rotation
-  return Math.atan2(velocity.y / speed, velocity.x / speed) - rotation;
-}
-
-let lastBurnAt = 0;
-const min_burn_time = 600;
-
-function log(...args) {
-  //console.log(...args);
-}
-
-function killVelocity(status) {
-  const rot_error = getKillVelocityAngleError(status);
-  const timeSinceLastBurn = Date.now() - lastBurnAt;
-  // Give the lander enough time to burn
-  if (Math.abs(rot_error) > getAllowedRotationError(status)) {
-    log(
-      `Kill rotation was off by ${Math.abs(
-        rot_error
-      )}, kicking back to first phase. Burn time was: ${timeSinceLastBurn}`
-    );
-    landers[status.id].phase = 0;
-    return nothing;
-  } else {
-    if (getSpeed(status) > max_landing_speed) {
-      lastBurnAt = Date.now();
-      return {
-        rotate: 0,
-        thrust: 1,
-      };
-    } else {
-      landers[status.id].phase = 2;
-      log('killed velocity. burned for', timeSinceLastBurn, 'millis');
-      return nothing;
-    }
-  }
-}
-
-function orientForLanding(status) {
-  const allowed_rot_goal_err = 0.05;
-
-  if (status.altitude < danger_altitude && getSpeed(status) > 7) {
-    log('Was in danger of crash, kicking back to killing velocity');
-    landers[status.id].phase = 1;
-    return nothing;
-  }
-
-  const am_error = -status.angular_momentum;
-  if (Math.abs(am_error) > getAllowedRotationSpeed(status)) {
-    return { rotate: Math.sign(am_error), thrust: 0 };
-  }
-
-  let rot_err = landing_rotation_goal - status.rotation;
-  if (Math.abs(rot_err) > allowed_rot_goal_err) {
-    return { rotate: Math.sign(rot_err), thrust: 0 };
-  }
-
-  if (status.altitude < hit_the_brakes_altitude) {
-    landers[status.id].phase = 1;
-    return nothing;
-  }
-
-  return nothing;
-}
-
-function orientToKillAngle(status) {
-  const speed = getSpeed(status);
-  const kill_angle = Math.atan2(
-    status.velocity.y / speed,
-    status.velocity.x / speed
-  );
-
-  if (status.altitude < danger_altitude && speed > 7) {
-    log('Was in danger of crash, kicking back to killing velocity');
-    landers[status.id].phase = 1;
-    return nothing;
-  }
-
-  const am_error = -status.angular_momentum;
-  if (Math.abs(am_error) > getAllowedRotationSpeed(status)) {
-    return { rotate: Math.sign(am_error), thrust: 0 };
-  }
-
-  // TODO: Try another atan2 for the current rotation
-  let rot_err = kill_angle - status.rotation;
-  if (Math.abs(rot_err) > getAllowedRotationError(status)) {
-    return { rotate: Math.sign(rot_err), thrust: 0 };
-  }
-
-  log('done orienting');
-  landers[status.id].phase = 1;
-  return nothing;
-}
-
-function landingAssist(status) {
-  if (landers[status.id].phase === 0) {
-    return orientToKillAngle(status);
-  }
-  if (landers[status.id].phase === 1) {
-    return killVelocity(status);
-  }
-  if (landers[status.id].phase === 2) {
-    return orientForLanding(status);
-  }
-  return nothing;
-}
-
-// AI Landing Assist starts here
-
-// Status will need to be converted into "input"
-// Actions will be the "output" of the network
-
-// Use the smart assist function to create a bunch of training data (easiest)
-
-// Once that works, throw different scenarios at the network for testing
-
-const PhaseDescriptions = {
-  0: 'Orienting to Kill Velocity Angle',
-  1: 'Killing Velocity',
-  2: 'Orienting For Landing',
-};
 
 function getInput({ altitude, velocity, rotation, x_pos, angular_momentum }) {
   const speed = Math.sqrt(velocity.y ** 2 + velocity.x ** 2);
@@ -218,6 +83,10 @@ function getInput({ altitude, velocity, rotation, x_pos, angular_momentum }) {
   ];
 }
 
+function getSpeed(status) {
+  return Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
+}
+
 function getFitnessScore(status) {
   // const speed = Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
   // console.log(speed);
@@ -238,15 +107,35 @@ function getRotate(x, y) {
   return -1;
 }
 
-function getAction(rotateLeft, rotateRight, throttleOn) {
-  const rotate = getRotate(rotateLeft, rotateRight);
-  const thrust = throttleOn > 0.5 ? 1 : 0;
-  return { rotate, thrust };
+function getActionIndex(outputs) {
+  let i = 0;
+  let maxIndex = 0;
+  let maxValue = -1;
+  for (let e of outputs) {
+    if (e > maxValue) {
+      maxValue = e;
+      maxIndex = i;
+    }
+    i++;
+  }
+  return maxIndex;
+}
+
+const actions = [
+  { rotate: 0, thrust: 0 },
+  { rotate: 0, thrust: 1 },
+  { rotate: 1, thrust: 0 },
+  { rotate: -1, thrust: 0 },
+];
+
+// These are discrete actions
+function getAction(outputs) {
+  return actions[getActionIndex(outputs)];
 }
 
 function machineLandingAssist(status) {
   let outputs = networks[status.id].predict(getInput(status));
-  return getAction(...outputs);
+  return getAction(outputs);
 }
 
 async function tick(id) {
@@ -297,6 +186,11 @@ function gameLoop() {
 }
 
 setInterval(gameLoop, 1000 / fps);
+
+setInterval(async () => {
+  const count = await getLanderCount();
+  console.log('Lander count:', count);
+}, 5000);
 
 function init() {
   for (let i = 0; i < generationSize; i++) {
@@ -351,6 +245,8 @@ function createLander() {
   return id;
 }
 
+// TODO: each action should cost points (that way we can train the network to value less actions over more...)
+
 function createNextGeneration() {
   // Find current top 3 and add last best
   let top = getTopNetworks();
@@ -382,16 +278,16 @@ function createNextGeneration() {
 
   // const half = Math.floor(generationSize / 2);
 
-  for (let i = 0; i < generation; i++) {
-    const id = createLander();
-    nextGenerationNetworks[id] = mutateNeuralNetwork(top[0].network);
-  }
+  // for (let i = 0; i < generationSize; i++) {
+  //   const id = createLander();
+  //   nextGenerationNetworks[id] = mutateNeuralNetwork(top[0].network);
+  // }
 
   // Decay learning rate
   // learningRate *= decayRate;
   // document.querySelector('#learning-rate').value = learningRate;
 
-  console.log('Learning rate set to', learningRate);
+  // console.log('Learning rate set to', learningRate);
 
   // for (let i = half; i < generationSize; i++) {
   //   const id = createLander();
@@ -399,7 +295,7 @@ function createNextGeneration() {
   // }
 
   // First section mutated from A
-  /*const third = Math.floor(generationSize / 3);
+  const third = Math.floor(generationSize / 3);
   for (let i = 0; i < third; i++) {
     const id = createLander();
     nextGenerationNetworks[id] = mutateNeuralNetwork(top[0].network);
@@ -419,7 +315,7 @@ function createNextGeneration() {
       top[0].network,
       mutateNeuralNetwork(top[2].network)
     );
-  }*/
+  }
 
   // Clean up previous generation networks
   for (let id in networks) {
