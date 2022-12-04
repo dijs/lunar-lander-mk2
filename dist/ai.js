@@ -1,8 +1,11 @@
-const input_node_count = 4;
+const input_node_count = 7;
 const output_node_count = 3;
+const decayRate = 0.9;
 
 let previous = false;
+
 let learningRate = 0.5;
+let mutateThreshold = 0.1;
 
 const random = (min, max) => {
   var rand;
@@ -52,10 +55,10 @@ const randomGaussian = (mean, sd) => {
 class NeuralNetwork {
   constructor() {
     this.weights = [
-      tf.randomNormal([input_node_count, 32]),
-      tf.randomNormal([32, 16]),
-      tf.randomNormal([16, 8]),
-      tf.randomNormal([8, output_node_count]),
+      tf.randomNormal([input_node_count, 128]),
+      // tf.randomNormal([32, 16]),
+      // tf.randomNormal([16, 8]),
+      tf.randomNormal([128, output_node_count]),
     ];
   }
   predict(user_input) {
@@ -64,9 +67,9 @@ class NeuralNetwork {
     tf.tidy(() => {
       const input_layer = tf.tensor(user_input, [1, input_node_count]);
       const hidden_layer1 = input_layer.matMul(this.weights[0]).sigmoid();
-      const hidden_layer2 = hidden_layer1.matMul(this.weights[1]).sigmoid();
-      const hidden_layer3 = hidden_layer2.matMul(this.weights[2]).sigmoid();
-      const output_layer = hidden_layer3.matMul(this.weights[3]).sigmoid();
+      // const hidden_layer2 = hidden_layer1.matMul(this.weights[1]).sigmoid();
+      // const hidden_layer3 = hidden_layer2.matMul(this.weights[2]).sigmoid();
+      const output_layer = hidden_layer1.matMul(this.weights[1]).sigmoid();
       output = output_layer.dataSync();
     });
     return output;
@@ -86,11 +89,19 @@ class NeuralNetwork {
   }
 }
 
-function fn(x) {
+function fn_old(x) {
   if (random(1) < 0.05) {
     let offset = randomGaussian() * learningRate;
-    let newx = x + offset;
-    return newx;
+    return x + offset;
+  }
+  return x;
+}
+
+function fn(x) {
+  if (Math.random() < mutateThreshold) {
+    const r = (Math.random() - 0.5) * 2;
+    const off = r * learningRate;
+    return x + off;
   }
   return x;
 }

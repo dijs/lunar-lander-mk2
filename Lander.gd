@@ -32,6 +32,12 @@ func _ready():
 	reset()
 	var _e = $Explosion.connect("animation_finished", self, "on_exploded")
 	_e = $RemoveTimer.connect("timeout", self, "queue_free")
+	_e = $TimeoutTimer.connect("timeout", self, "on_out")
+
+func on_out():
+	global_position.x = 10000
+	result = CRASHED
+	$RemoveTimer.start()
 
 func get_status():
 	return {

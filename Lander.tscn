@@ -120,3 +120,8 @@ enabled = true
 
 [node name="RemoveTimer" type="Timer" parent="."]
 one_shot = true
+
+[node name="TimeoutTimer" type="Timer" parent="."]
+wait_time = 15.0
+one_shot = true
+autostart = true

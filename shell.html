@@ -6,6 +6,10 @@
     </head>
     <body>
         <button onclick="init()">Create Initial Generation</button>
+
+        <input type="range" min="0" max="1" step=".01" id="learning-rate" value="0.5"/>
+        <input type="range" min="0" max="1" step=".01" id="mutate-threshold"  value="0.1"/>
+
         <canvas width="1024" height="600" id="canvas"></canvas>
         <div id="status">Phase 0</div>
         <script src="$GODOT_URL"></script>

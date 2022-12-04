@@ -1,3 +1,5 @@
+document.body.style.backgroundColor = 'black';
+
 const fps = 10;
 
 let id_counter = 128;
@@ -9,7 +11,7 @@ const LANDED = 1;
 const CRASHED = -1;
 
 const ground_level = 114;
-const generationSize = 3 * 20; // Must be a mulitple of 3
+const generationSize = 100; // Must be a mulitple of 3
 
 let generation = 1;
 let networks = {};
@@ -192,7 +194,7 @@ const PhaseDescriptions = {
   2: 'Orienting For Landing',
 };
 
-function getInput({ altitude, velocity, rotation, x_pos }) {
+function getInput({ altitude, velocity, rotation, x_pos, angular_momentum }) {
   const speed = Math.sqrt(velocity.y ** 2 + velocity.x ** 2);
   const ux = velocity.x / speed;
   const uy = velocity.y / speed;
@@ -203,35 +205,41 @@ function getInput({ altitude, velocity, rotation, x_pos }) {
   rot = (rot + Math.PI) / 2;
 
   // Normalize x position
-  const x = Math.min(1, Math.max(0, x_pos / 500));
+  const x = x_pos / 500;
 
   return [
     altitude / ground_level,
-    // ux,
-    // uy,
+    ux,
+    uy,
     rot,
     x,
-    speed / 1000,
+    speed / 300,
+    angular_momentum / 100,
   ];
 }
 
 function getFitnessScore(status) {
   // const speed = Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
-
   // console.log(speed);
 
   return (
     100 -
     getSpeed(status) -
-    Math.abs(status.angular_momentum) * 5 -
+    Math.abs(status.angular_momentum) * 3 -
+    // Math.abs(Math.PI / 2 - status.rotation) * 10 -
     // Make the x position not as important as the other variables
-    Math.abs(status.x_pos) / 5 -
-    Math.abs(Math.PI / 2 - status.rotation)
+    Math.abs(status.x_pos) / 10
   );
 }
 
+function getRotate(x, y) {
+  if (x < 0.5 && y < 0.5) return 0;
+  if (x >= y) return 1;
+  return -1;
+}
+
 function getAction(rotateLeft, rotateRight, throttleOn) {
-  const rotate = rotateLeft > 0.5 ? -1 : rotateRight > 0.5 ? 1 : 0;
+  const rotate = getRotate(rotateLeft, rotateRight);
   const thrust = throttleOn > 0.5 ? 1 : 0;
   return { rotate, thrust };
 }
@@ -262,9 +270,15 @@ async function tick(id) {
       'Lander #',
       id,
       'crashed after',
-      Math.round(since / 1000)
-      // 'seconds with a score of',
-      // landers[id].score
+      Math.round(since / 1000),
+      'seconds with a score of',
+      Math.round(landers[id].score),
+      '| speed',
+      Math.round(getSpeed(status)),
+      ',ang mom',
+      Math.round(status.angular_momentum),
+      ',x',
+      Math.round(status.x_pos)
     );
   }
 }
@@ -374,7 +388,8 @@ function createNextGeneration() {
   }
 
   // Decay learning rate
-  learningRate *= 0.95;
+  // learningRate *= decayRate;
+  // document.querySelector('#learning-rate').value = learningRate;
 
   console.log('Learning rate set to', learningRate);
 
@@ -463,3 +478,11 @@ let opts = {
 let uplot = new uPlot(opts, data, document.body);
 
 setTimeout(init, 1000);
+
+document.querySelector('#learning-rate').addEventListener('change', (e) => {
+  learningRate = parseFloat(e.currentTarget.value);
+});
+
+document.querySelector('#mutate-threshold').addEventListener('change', (e) => {
+  mutateThreshold = parseFloat(e.currentTarget.value);
+});
