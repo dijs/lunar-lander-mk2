@@ -87,15 +87,6 @@ function getLanderCount() {
   });
 }
 
-// (Continuous): X distance from target site
-// (Continuous): Y distance from target site
-// (Continuous): X velocity
-// (Continuous): Y velocity
-// (Continuous): Angle of ship
-// (Continuous): Angular velocity of ship
-// (Binary): Left leg is grounded
-// (Binary): Right leg is grounded
-
 function normalizeAngle(a) {
   let rot = Math.atan2(Math.sin(a), Math.cos(a));
   return (rot + Math.PI) / 2;
@@ -129,6 +120,10 @@ function getFitnessScore(status) {
 }
 
 function machineLandingAssist(status) {
+  if (!networks[status.id]) {
+    console.log('There was not network for lander', status.id);
+    return { thrust: 0, rotate: 0 };
+  }
   const results = networks[status.id].classifySync(getInput(status));
   const action = results[0].label;
   if (action !== 'nothing') {
@@ -193,18 +188,19 @@ function gameLoop() {
 setInterval(gameLoop, 1000 / fps);
 
 function init() {
-  for (let i = 0; i < generationSize; i++) {
-    const id = createLander();
-    networks[id] = ml5.neuralNetwork(options);
-    // Load best network from local storage
-    // let data = localStorage.getItem('best');
-    // if (data) {
-    //   networks[id].dispose();
-    //   data = JSON.parse(data);
-    //   networks[id].weights = data.weights.map((w) => tf.tensor(w));
-    // }
-  }
-  started = true;
+  lastBestNetwork = ml5.neuralNetwork(options);
+  const modelInfo = {
+    model: 'http://localhost:8080/model/model.json',
+    metadata: 'http://localhost:8080/model/model_meta.json',
+    weights: 'http://localhost:8080/model/model.weights.bin',
+  };
+  lastBestNetwork.load(modelInfo, () => {
+    for (let i = 0; i < generationSize; i++) {
+      const id = createLander();
+      networks[id] = lastBestNetwork.copy();
+    }
+    started = true;
+  });
 }
 
 function findBestLanderId() {
@@ -273,14 +269,6 @@ function createNextGeneration() {
     lastBestNetwork = ml5.neuralNetwork(options);
   }
 
-  // Save best to local storage
-  // localStorage.setItem(
-  //   'best',
-  //   JSON.stringify({
-  //     weights: lastBestNetwork.weights.map((w) => w.arraySync()),
-  //   })
-  // );
-
   // Update chart
   data[0].push(generation);
   data[1].push(lastBestScore);
@@ -305,39 +293,34 @@ function createNextGeneration() {
   // document.querySelector('#learning-rate').value = learningRate;
   // document.querySelector('#mutate-threshold').value = mutateThreshold;
 
-  for (let i = 0; i < generationSize; i++) {
+  // Simple version
+  // for (let i = 0; i < generationSize; i++) {
+  //   const id = createLander();
+  //   const net = lastBestNetwork.copy();
+  //   net.mutate(learningRate);
+  //   nextGenerationNetworks[id] = net;
+  // }
+
+  // TODO: Do a cross over with the top networks
+
+  const mid = Math.floor(generationSize / 2);
+
+  for (let i = 0; i < mid; i++) {
     const id = createLander();
     const net = lastBestNetwork.copy();
-    net.mutate(0.5);
-    // TODO: I may do a crossover as well....
+    net.mutate(learningRate);
     nextGenerationNetworks[id] = net;
-
-    // mutateNeuralNetwork(top[0].network);
   }
 
-  /*
-  // First section mutated from A
-  const third = Math.floor(generationSize / 3);
-  for (let i = 0; i < third; i++) {
-    const id = createLander();
-    nextGenerationNetworks[id] = mutateNeuralNetwork(top[0].network);
+  // Make sure we have a second best
+  if (top[1]) {
+    for (let i = mid; i < generationSize; i++) {
+      const id = createLander();
+      const net = lastBestNetwork.crossover(top[1].network);
+      net.mutate(learningRate);
+      nextGenerationNetworks[id] = net;
+    }
   }
-  // Second section AB crossover
-  for (let i = third; i < third * 2; i++) {
-    const id = createLander();
-    nextGenerationNetworks[id] = crossoverNeuralNetwork(
-      top[0].network,
-      mutateNeuralNetwork(top[1].network)
-    );
-  }
-  // Third section AC crossover
-  for (let i = third * 2; i < generationSize; i++) {
-    const id = createLander();
-    nextGenerationNetworks[id] = crossoverNeuralNetwork(
-      top[0].network,
-      mutateNeuralNetwork(top[2].network)
-    );
-  }*/
 
   // Clean up previous generation networks
   for (let id in networks) {
@@ -396,15 +379,26 @@ let opts = {
 
 let uplot = new uPlot(opts, data, document.body);
 
+function save() {
+  lastBestNetwork.save();
+}
+
+function load() {
+  // TODO: Implement loading in lastBestNetwork
+  // - Remove all landers and networks
+  // - Reset all vars
+  // - Call load on neural network from ml5
+}
+
 setTimeout(init, 1000);
 
-// document.querySelector('#learning-rate').addEventListener('change', (e) => {
-//   learningRate = parseFloat(e.currentTarget.value);
-// });
+document.querySelector('#learning-rate').addEventListener('change', (e) => {
+  learningRate = parseFloat(e.currentTarget.value);
+});
 
 // document.querySelector('#mutate-threshold').addEventListener('change', (e) => {
 //   mutateThreshold = parseFloat(e.currentTarget.value);
 // });
 
-// document.querySelector('#learning-rate').value = learningRate;
+document.querySelector('#learning-rate').value = learningRate;
 // document.querySelector('#mutate-threshold').value = mutateThreshold;

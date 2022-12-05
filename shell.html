@@ -5,22 +5,18 @@
         <meta charset="UTF-8">
     </head>
     <body>
-        <button onclick="init()">Create Initial Generation</button>
-
-        <input type="range" min="0" max="1" step=".01" id="learning-rate" value="0.5"/>
-        <input type="range" min="0" max="1" step=".01" id="mutate-threshold"  value="0.1"/>
-
+        <button onclick="save()">Save</button>
+        <button onclick="load()">Load</button>
+        <label>Learning Rate <input type="range" min="0" max="1" step=".01" id="learning-rate" value="0.5"/></label>
         <canvas width="1024" height="600" id="canvas"></canvas>
-        <div id="status">Phase 0</div>
+        <div id="status"></div>
         <script src="$GODOT_URL"></script>
         <script>
           var engine = new Engine($GODOT_CONFIG);
         </script>
         <link rel="stylesheet" href="/libs/uPlot.min.css">
         <script src="/libs/uPlot.iife.min.js"></script>
-        <!-- <script src="/libs/tf.min.js"></script> -->
         <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
-        <script src="/ai.js"></script>
         <script src="/app.js"></script>
     </body>
 </html>
