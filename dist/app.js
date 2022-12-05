@@ -15,12 +15,12 @@ const ground_level = 114;
 const generationSize = 64; // Must be a mulitple of 3
 const tooStuckCount = 5;
 
-const actions = [
-  { rotate: 0, thrust: 0 },
-  { rotate: 0, thrust: 1 },
-  { rotate: 1, thrust: 0 },
-  { rotate: -1, thrust: 0 },
-];
+const actions = {
+  nothing: { rotate: 0, thrust: 0 },
+  thrust: { rotate: 0, thrust: 1 },
+  rot_left: { rotate: 1, thrust: 0 },
+  rot_right: { rotate: -1, thrust: 0 },
+};
 
 let generation = 1;
 let networks = {};
@@ -28,6 +28,22 @@ let started = false;
 let lastBestScore = 0;
 let lastBestNetwork = null;
 let stuckCount = 0;
+
+/////// AI
+
+const input_node_count = 6;
+const output_node_count = 4;
+const decayRate = 0.99;
+
+let learningRate = 0.3;
+let mutateThreshold = 0.1;
+
+const options = {
+  inputs: input_node_count,
+  outputs: ['nothing', 'thrust', 'rot_left', 'rot_right'],
+  task: 'classification',
+  noTraining: true,
+};
 
 ////////////////////////////////////////////////////////////
 
@@ -112,27 +128,13 @@ function getFitnessScore(status) {
   );
 }
 
-function getActionIndex(outputs) {
-  let i = 0;
-  let maxIndex = 0;
-  let maxValue = -1;
-  for (let e of outputs) {
-    if (e > maxValue) {
-      maxValue = e;
-      maxIndex = i;
-    }
-    i++;
-  }
-  return maxIndex;
-}
-
 function machineLandingAssist(status) {
-  const outputs = networks[status.id].predict(getInput(status));
-  const actionIndex = getActionIndex(outputs);
-  if (actionIndex > 0) {
+  const results = networks[status.id].classifySync(getInput(status));
+  const action = results[0].label;
+  if (action !== 'nothing') {
     landers[status.id].count++;
   }
-  return actions[actionIndex];
+  return actions[action];
 }
 
 async function tick(id) {
@@ -193,14 +195,14 @@ setInterval(gameLoop, 1000 / fps);
 function init() {
   for (let i = 0; i < generationSize; i++) {
     const id = createLander();
-    networks[id] = new NeuralNetwork();
+    networks[id] = ml5.neuralNetwork(options);
     // Load best network from local storage
-    let data = localStorage.getItem('best');
-    if (data) {
-      networks[id].dispose();
-      data = JSON.parse(data);
-      networks[id].weights = data.weights.map((w) => tf.tensor(w));
-    }
+    // let data = localStorage.getItem('best');
+    // if (data) {
+    //   networks[id].dispose();
+    //   data = JSON.parse(data);
+    //   networks[id].weights = data.weights.map((w) => tf.tensor(w));
+    // }
   }
   started = true;
 }
@@ -243,6 +245,7 @@ function createLander() {
     count: 0,
     gen: generation,
     started: Date.now(),
+    // TODO: Add brain property here with neural network if I can get this working...
   };
   sendAction({ type: 'create', id, x: -436, y: -219 });
   id_counter += 1;
@@ -259,20 +262,24 @@ function createNextGeneration() {
 
   // Update last best
   if (top[0].score > lastBestScore) {
-    lastBestNetwork = top[0].network.clone();
+    lastBestNetwork = top[0].network.copy();
     lastBestScore = top[0].score;
     stuckCount = 0;
   } else {
     stuckCount++;
   }
 
+  if (!lastBestNetwork) {
+    lastBestNetwork = ml5.neuralNetwork(options);
+  }
+
   // Save best to local storage
-  localStorage.setItem(
-    'best',
-    JSON.stringify({
-      weights: lastBestNetwork.weights.map((w) => w.arraySync()),
-    })
-  );
+  // localStorage.setItem(
+  //   'best',
+  //   JSON.stringify({
+  //     weights: lastBestNetwork.weights.map((w) => w.arraySync()),
+  //   })
+  // );
 
   // Update chart
   data[0].push(generation);
@@ -284,8 +291,8 @@ function createNextGeneration() {
   const nextGenerationNetworks = {};
 
   // Decay learning variables
-  learningRate *= decayRate;
-  mutateThreshold *= decayRate;
+  // learningRate *= decayRate;
+  // mutateThreshold *= decayRate;
 
   // TODO: Apparently 0.2 for both is doing well for me
 
@@ -295,12 +302,17 @@ function createNextGeneration() {
   //   console.log('Training stagnated. Resetting learning rates');
   // }
 
-  document.querySelector('#learning-rate').value = learningRate;
-  document.querySelector('#mutate-threshold').value = mutateThreshold;
+  // document.querySelector('#learning-rate').value = learningRate;
+  // document.querySelector('#mutate-threshold').value = mutateThreshold;
 
   for (let i = 0; i < generationSize; i++) {
     const id = createLander();
-    nextGenerationNetworks[id] = mutateNeuralNetwork(top[0].network);
+    const net = lastBestNetwork.copy();
+    net.mutate(0.5);
+    // TODO: I may do a crossover as well....
+    nextGenerationNetworks[id] = net;
+
+    // mutateNeuralNetwork(top[0].network);
   }
 
   /*
@@ -333,6 +345,7 @@ function createNextGeneration() {
   }
 
   networks = nextGenerationNetworks;
+
   console.log(
     'Started Generation',
     generation,
@@ -385,13 +398,13 @@ let uplot = new uPlot(opts, data, document.body);
 
 setTimeout(init, 1000);
 
-document.querySelector('#learning-rate').addEventListener('change', (e) => {
-  learningRate = parseFloat(e.currentTarget.value);
-});
+// document.querySelector('#learning-rate').addEventListener('change', (e) => {
+//   learningRate = parseFloat(e.currentTarget.value);
+// });
 
-document.querySelector('#mutate-threshold').addEventListener('change', (e) => {
-  mutateThreshold = parseFloat(e.currentTarget.value);
-});
+// document.querySelector('#mutate-threshold').addEventListener('change', (e) => {
+//   mutateThreshold = parseFloat(e.currentTarget.value);
+// });
 
-document.querySelector('#learning-rate').value = learningRate;
-document.querySelector('#mutate-threshold').value = mutateThreshold;
+// document.querySelector('#learning-rate').value = learningRate;
+// document.querySelector('#mutate-threshold').value = mutateThreshold;
