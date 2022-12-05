@@ -12,8 +12,12 @@ const CRASHED = -1;
 
 const win_points = 100;
 const ground_level = 114;
-const generationSize = 64; // Must be a mulitple of 3
+const generationSize = 100;
 const tooStuckCount = 5;
+
+const winSpeedThreshold = 8;
+const winAngMomThreshold = 10;
+const upRightRotation = Math.PI / 2;
 
 const actions = {
   nothing: { rotate: 0, thrust: 0 },
@@ -35,7 +39,7 @@ const input_node_count = 6;
 const output_node_count = 4;
 const decayRate = 0.99;
 
-let learningRate = 0.3;
+let learningRate = 0.01;
 let mutateThreshold = 0.1;
 
 const options = {
@@ -112,9 +116,9 @@ function getFitnessScore(status) {
     win_points -
     getSpeed(status) -
     Math.abs(status.angular_momentum) * 3 -
-    // Math.abs(Math.PI / 2 - status.rotation) * 10 -
+    Math.abs(upRightRotation - status.rotation) -
     // Make the x position not as important as the other variables
-    Math.abs(status.x_pos) / 10 -
+    Math.abs(status.x_pos) / 25 -
     landers[status.id].count / 4
   );
 }
@@ -132,44 +136,63 @@ function machineLandingAssist(status) {
   return actions[action];
 }
 
+function handleLanding(id, status) {
+  const action = { type: 'act', id, ...machineLandingAssist(status) };
+  sendAction(action);
+}
+
+function handleLanded(id, status) {
+  landers[id].status = LANDED;
+
+  // Award more points for better landings
+  const x = winSpeedThreshold - getSpeed(status);
+  const y = winAngMomThreshold - status.angular_momentum;
+  const z = Math.abs(upRightRotation - status.rotation);
+  const k = landers[id].count / 2;
+  // TODO: Add time here as well later on
+
+  landers[id].score = win_points + x + y - z - k;
+
+  console.log('#', id, 'landed with a score of', landers[id].score);
+}
+
+function handleCrash(id, status) {
+  landers[id].status = CRASHED;
+  const score = getFitnessScore(status);
+  landers[id].score = score;
+  const delta = Math.abs(score - lastBestScore);
+  if (delta <= 15) {
+    // const since = Date.now() - landers[id].started;
+    console.log(
+      'Lander #',
+      id,
+      'crashed with a score of',
+      // Math.round(since / 1000),
+      // 'seconds with a score of',
+      Math.round(landers[id].score),
+      '| speed',
+      Math.round(getSpeed(status)),
+      ',ang mom',
+      Math.round(status.angular_momentum),
+      ',x',
+      Math.round(status.x_pos),
+      ' | used',
+      landers[id].count,
+      'actions | rot was',
+      Math.round(status.rotation * (180 / Math.PI))
+    );
+  }
+}
+
+const handlers = {
+  [LANDING]: handleLanding,
+  [LANDED]: handleLanded,
+  [CRASHED]: handleCrash,
+};
+
 async function tick(id) {
   const status = await getStatus(id);
-
-  if (status.landed === 0) {
-    // const action = { type: 'act', id, ...landingAssist(status) };
-    const action = { type: 'act', id, ...machineLandingAssist(status) };
-    sendAction(action);
-  }
-  if (status.landed === 1) {
-    landers[id].status = LANDED;
-    landers[id].score = win_points;
-    console.log(id, 'landed');
-  }
-  if (status.landed === -1) {
-    landers[id].status = CRASHED;
-    const score = getFitnessScore(status);
-    landers[id].score = score;
-    if (score > lastBestScore) {
-      const since = Date.now() - landers[id].started;
-      console.log(
-        'Lander #',
-        id,
-        'crashed after',
-        Math.round(since / 1000),
-        'seconds with a score of',
-        Math.round(landers[id].score),
-        '| speed',
-        Math.round(getSpeed(status)),
-        ',ang mom',
-        Math.round(status.angular_momentum),
-        ',x',
-        Math.round(status.x_pos),
-        ' | used',
-        landers[id].count,
-        'actions'
-      );
-    }
-  }
+  handlers[status.landed](id, status);
 }
 
 function gameLoop() {
@@ -301,23 +324,35 @@ function createNextGeneration() {
   //   nextGenerationNetworks[id] = net;
   // }
 
-  // TODO: Do a cross over with the top networks
+  if (lastBestScore < 100) {
+    const third = Math.floor(generationSize / 3);
 
-  const mid = Math.floor(generationSize / 2);
-
-  for (let i = 0; i < mid; i++) {
-    const id = createLander();
-    const net = lastBestNetwork.copy();
-    net.mutate(learningRate);
-    nextGenerationNetworks[id] = net;
-  }
-
-  // Make sure we have a second best
-  if (top[1]) {
-    for (let i = mid; i < generationSize; i++) {
+    for (let i = 0; i < third; i++) {
       const id = createLander();
-      const net = lastBestNetwork.crossover(top[1].network);
+      const net = lastBestNetwork.copy();
       net.mutate(learningRate);
+      nextGenerationNetworks[id] = net;
+    }
+
+    // Make sure we have a second best
+    if (top[1]) {
+      for (let i = third; i < third * 2; i++) {
+        const id = createLander();
+        const net = top[1].network.crossover(lastBestNetwork);
+        net.mutate(learningRate);
+        nextGenerationNetworks[id] = net;
+      }
+      for (let i = third * 2; i < generationSize; i++) {
+        const id = createLander();
+        const net = lastBestNetwork.crossover(top[1].network);
+        net.mutate(learningRate);
+        nextGenerationNetworks[id] = net;
+      }
+    }
+  } else {
+    for (let i = 0; i < generationSize; i++) {
+      const id = createLander();
+      const net = lastBestNetwork.copy();
       nextGenerationNetworks[id] = net;
     }
   }
