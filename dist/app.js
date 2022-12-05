@@ -13,6 +13,7 @@ const CRASHED = -1;
 const win_points = 100;
 const ground_level = 114;
 const generationSize = 64; // Must be a mulitple of 3
+const tooStuckCount = 5;
 
 const actions = [
   { rotate: 0, thrust: 0 },
@@ -26,6 +27,7 @@ let networks = {};
 let started = false;
 let lastBestScore = 0;
 let lastBestNetwork = null;
+let stuckCount = 0;
 
 ////////////////////////////////////////////////////////////
 
@@ -256,8 +258,13 @@ function createNextGeneration() {
   }
 
   // Update last best
-  lastBestNetwork = top[0].network.clone();
-  lastBestScore = top[0].score;
+  if (top[0].score > lastBestScore) {
+    lastBestNetwork = top[0].network.clone();
+    lastBestScore = top[0].score;
+    stuckCount = 0;
+  } else {
+    stuckCount++;
+  }
 
   // Save best to local storage
   localStorage.setItem(
@@ -276,14 +283,20 @@ function createNextGeneration() {
   generation++;
   const nextGenerationNetworks = {};
 
-  // Decay learning rate
+  // Decay learning variables
   learningRate *= decayRate;
-  document.querySelector('#learning-rate').value = learningRate;
+  mutateThreshold *= decayRate;
 
-  // TODO: If the best score has not changed after 3 generations
-  // - Reset the learning rate
-  // - Bump up the mutation threshold
-  // TODO: Should I decay the mutation threshold as well??
+  // TODO: Apparently 0.2 for both is doing well for me
+
+  // if (stuckCount >= tooStuckCount) {
+  //   learningRate = 0.5;
+  //   mutateThreshold = 0.5;
+  //   console.log('Training stagnated. Resetting learning rates');
+  // }
+
+  document.querySelector('#learning-rate').value = learningRate;
+  document.querySelector('#mutate-threshold').value = mutateThreshold;
 
   for (let i = 0; i < generationSize; i++) {
     const id = createLander();
