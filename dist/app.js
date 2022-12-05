@@ -10,8 +10,9 @@ const LANDING = 0;
 const LANDED = 1;
 const CRASHED = -1;
 
+const win_points = 100;
 const ground_level = 114;
-const generationSize = 3 * 33; // Must be a mulitple of 3
+const generationSize = 64; // Must be a mulitple of 3
 
 const actions = [
   { rotate: 0, thrust: 0 },
@@ -99,7 +100,7 @@ function getSpeed(status) {
 
 function getFitnessScore(status) {
   return (
-    100 -
+    win_points -
     getSpeed(status) -
     Math.abs(status.angular_momentum) * 3 -
     // Math.abs(Math.PI / 2 - status.rotation) * 10 -
@@ -142,30 +143,33 @@ async function tick(id) {
   }
   if (status.landed === 1) {
     landers[id].status = LANDED;
-    landers[id].score = 100;
+    landers[id].score = win_points;
     console.log(id, 'landed');
   }
   if (status.landed === -1) {
     landers[id].status = CRASHED;
-    landers[id].score = getFitnessScore(status);
-    const since = Date.now() - landers[id].started;
-    console.log(
-      'Lander #',
-      id,
-      'crashed after',
-      Math.round(since / 1000),
-      'seconds with a score of',
-      Math.round(landers[id].score),
-      '| speed',
-      Math.round(getSpeed(status)),
-      ',ang mom',
-      Math.round(status.angular_momentum),
-      ',x',
-      Math.round(status.x_pos),
-      ' | used',
-      landers[id].count,
-      'actions'
-    );
+    const score = getFitnessScore(status);
+    landers[id].score = score;
+    if (score > lastBestScore) {
+      const since = Date.now() - landers[id].started;
+      console.log(
+        'Lander #',
+        id,
+        'crashed after',
+        Math.round(since / 1000),
+        'seconds with a score of',
+        Math.round(landers[id].score),
+        '| speed',
+        Math.round(getSpeed(status)),
+        ',ang mom',
+        Math.round(status.angular_momentum),
+        ',x',
+        Math.round(status.x_pos),
+        ' | used',
+        landers[id].count,
+        'actions'
+      );
+    }
   }
 }
 
@@ -183,11 +187,6 @@ function gameLoop() {
 }
 
 setInterval(gameLoop, 1000 / fps);
-
-setInterval(async () => {
-  const count = await getLanderCount();
-  console.log('Lander count:', count);
-}, 5000);
 
 function init() {
   for (let i = 0; i < generationSize; i++) {
@@ -213,7 +212,12 @@ function findBestLanderId() {
       bestId = id;
     }
   }
-  console.log('Best lander was', bestId, 'with a score of', bestScore);
+  console.log(
+    'Best lander was',
+    bestId,
+    'with a score of',
+    Math.round(bestScore)
+  );
   return bestId;
 }
 
@@ -275,8 +279,18 @@ function createNextGeneration() {
   // Decay learning rate
   learningRate *= decayRate;
   document.querySelector('#learning-rate').value = learningRate;
-  console.log('Learning rate set to', learningRate);
 
+  // TODO: If the best score has not changed after 3 generations
+  // - Reset the learning rate
+  // - Bump up the mutation threshold
+  // TODO: Should I decay the mutation threshold as well??
+
+  for (let i = 0; i < generationSize; i++) {
+    const id = createLander();
+    nextGenerationNetworks[id] = mutateNeuralNetwork(top[0].network);
+  }
+
+  /*
   // First section mutated from A
   const third = Math.floor(generationSize / 3);
   for (let i = 0; i < third; i++) {
@@ -298,7 +312,7 @@ function createNextGeneration() {
       top[0].network,
       mutateNeuralNetwork(top[2].network)
     );
-  }
+  }*/
 
   // Clean up previous generation networks
   for (let id in networks) {
@@ -310,7 +324,7 @@ function createNextGeneration() {
     'Started Generation',
     generation,
     'Best score was',
-    lastBestScore
+    Math.round(lastBestScore)
   );
 }
 
