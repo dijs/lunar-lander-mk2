@@ -148,7 +148,7 @@ function handleLanded(id, status) {
   // Award more points for better landings
   const x = winSpeedThreshold - getSpeed(status) * 4;
   const y = winAngMomThreshold - status.angular_momentum;
-  const z = Math.abs(upRightRotation - status.rotation) * 4;
+  const z = Math.abs(upRightRotation - status.rotation) * 8;
   const k = landers[id].count / 2;
   // TODO: Add time here as well later on
 
@@ -179,7 +179,18 @@ function handleLanded(id, status) {
 // # 2133 landed with a score of 124 | -31 10 0.25 4.5
 
 // # Gen 18
-// # 1620 landed with a score of 125 | -29.25561058812871 9.85 0.7566666928204135 4.5
+// # 1620 landed with a score of 125 | -29 9.85 0.75 4.5
+
+// # Gen 4
+// # 381 landed with a score of 132 | -23 9.85 0.13 4.5
+
+// Gen 31
+// # 3061 landed with a score of 146 | -8 9.85 1.1 4.5
+
+// TODO: If I want to use a different network size:
+// - Use the old network and create randomly generated inputs to create training data.
+// - Train new network against that training data until error is low
+// - Continue training as I am now with real simulations
 
 function handleCrash(id, status) {
   landers[id].status = CRASHED;
