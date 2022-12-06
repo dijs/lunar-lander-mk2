@@ -119,6 +119,7 @@ frames = SubResource( 21 )
 enabled = true
 
 [node name="RemoveTimer" type="Timer" parent="."]
+wait_time = 3.0
 one_shot = true
 
 [node name="TimeoutTimer" type="Timer" parent="."]

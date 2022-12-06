@@ -47,6 +47,7 @@ const options = {
   outputs: ['nothing', 'thrust', 'rot_left', 'rot_right'],
   task: 'classification',
   noTraining: true,
+  learningRate: 0.05,
 };
 
 ////////////////////////////////////////////////////////////
@@ -118,7 +119,7 @@ function getFitnessScore(status) {
     Math.abs(status.angular_momentum) * 3 -
     Math.abs(upRightRotation - status.rotation) -
     // Make the x position not as important as the other variables
-    Math.abs(status.x_pos) / 25 -
+    Math.abs(status.x_pos) / 30 -
     landers[status.id].count / 4
   );
 }
@@ -145,23 +146,47 @@ function handleLanded(id, status) {
   landers[id].status = LANDED;
 
   // Award more points for better landings
-  const x = winSpeedThreshold - getSpeed(status);
+  const x = winSpeedThreshold - getSpeed(status) * 4;
   const y = winAngMomThreshold - status.angular_momentum;
-  const z = Math.abs(upRightRotation - status.rotation);
+  const z = Math.abs(upRightRotation - status.rotation) * 4;
   const k = landers[id].count / 2;
   // TODO: Add time here as well later on
 
-  landers[id].score = win_points + x + y - z - k;
+  // add a bonus so that non-landers will be far from real landers
+  const bonus = 50;
 
-  console.log('#', id, 'landed with a score of', landers[id].score);
+  landers[id].score = win_points + bonus + x + y - z - k;
+
+  console.log(
+    '#',
+    id,
+    'landed with a score of',
+    Math.round(landers[id].score),
+    '|',
+    x,
+    y,
+    z,
+    k
+  );
 }
+
+// @ Generation 7
+// # 535 landed with a score of 103.93461480540564 | -0.8892184625433188 9.85 0.5261667320510344 4.5
+// # 539 landed with a score of 103.33588310226042 | -1.487950165688531 9.85 0.5261667320510344 4.5
+// # 572 landed with a score of 100.53460638709464 | -0.5355968808543192 9.85 4.279796732051036 4.5
+
+// # Gen 23
+// # 2133 landed with a score of 124 | -31 10 0.25 4.5
+
+// # Gen 18
+// # 1620 landed with a score of 125 | -29.25561058812871 9.85 0.7566666928204135 4.5
 
 function handleCrash(id, status) {
   landers[id].status = CRASHED;
   const score = getFitnessScore(status);
   landers[id].score = score;
   const delta = Math.abs(score - lastBestScore);
-  if (delta <= 15) {
+  if (delta < 10) {
     // const since = Date.now() - landers[id].started;
     console.log(
       'Lander #',
@@ -317,6 +342,7 @@ function createNextGeneration() {
   // document.querySelector('#mutate-threshold').value = mutateThreshold;
 
   // Simple version
+
   // for (let i = 0; i < generationSize; i++) {
   //   const id = createLander();
   //   const net = lastBestNetwork.copy();
@@ -324,35 +350,27 @@ function createNextGeneration() {
   //   nextGenerationNetworks[id] = net;
   // }
 
-  if (lastBestScore < 100) {
-    const third = Math.floor(generationSize / 3);
+  const third = Math.floor(generationSize / 3);
 
-    for (let i = 0; i < third; i++) {
+  for (let i = 0; i < third; i++) {
+    const id = createLander();
+    const net = lastBestNetwork.copy();
+    net.mutate(learningRate);
+    nextGenerationNetworks[id] = net;
+  }
+
+  // Make sure we have a second best
+  if (top[1]) {
+    for (let i = third; i < third * 2; i++) {
       const id = createLander();
-      const net = lastBestNetwork.copy();
+      const net = top[1].network.crossover(lastBestNetwork);
       net.mutate(learningRate);
       nextGenerationNetworks[id] = net;
     }
-
-    // Make sure we have a second best
-    if (top[1]) {
-      for (let i = third; i < third * 2; i++) {
-        const id = createLander();
-        const net = top[1].network.crossover(lastBestNetwork);
-        net.mutate(learningRate);
-        nextGenerationNetworks[id] = net;
-      }
-      for (let i = third * 2; i < generationSize; i++) {
-        const id = createLander();
-        const net = lastBestNetwork.crossover(top[1].network);
-        net.mutate(learningRate);
-        nextGenerationNetworks[id] = net;
-      }
-    }
-  } else {
-    for (let i = 0; i < generationSize; i++) {
+    for (let i = third * 2; i < generationSize; i++) {
       const id = createLander();
-      const net = lastBestNetwork.copy();
+      const net = lastBestNetwork.crossover(top[1].network);
+      net.mutate(learningRate);
       nextGenerationNetworks[id] = net;
     }
   }

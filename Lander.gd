@@ -9,7 +9,7 @@ export var initial_fuel = 10
 
 export var max_thrust = 50
 export var spin_amount = 3
-export var fall_speed_threshold = 8
+export var fall_speed_threshold = 10
 export var angl_speed_threshold = 10
 
 const LANDED = 1
@@ -35,9 +35,10 @@ func _ready():
 	_e = $TimeoutTimer.connect("timeout", self, "on_out")
 
 func on_out():
-	global_position.x = 10000
-	result = CRASHED
-	$RemoveTimer.start()
+	if result == 0:
+		global_position.x = 10000
+		result = CRASHED
+		$RemoveTimer.start()
 
 func get_status():
 	return {
@@ -116,6 +117,7 @@ func _physics_process(delta):
 				result = CRASHED
 			else:
 				result = LANDED
+				$RemoveTimer.start()
 		
 		# Check if it fell outside of bounds
 		if position.y > 200:
