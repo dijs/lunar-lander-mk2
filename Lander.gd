@@ -1,5 +1,7 @@
 extends KinematicBody2D
 
+signal removed
+
 # Presets which determine different scenarios
 export var initial_velocity = Vector2.RIGHT * 100
 export var initial_rotation = -PI / 2
@@ -25,6 +27,7 @@ var zoom_goal = Vector2.ONE
 var fuel = 0
 var result = 0
 var id = '0'
+var is_bot = false
 
 var _callback_ref = JavaScript.create_callback(self, "on_js_input")
 
@@ -33,6 +36,8 @@ func _ready():
 	var _e = $Explosion.connect("animation_finished", self, "on_exploded")
 	_e = $RemoveTimer.connect("timeout", self, "queue_free")
 	_e = $TimeoutTimer.connect("timeout", self, "on_out")
+	if is_bot:
+		$TimeoutTimer.start()
 
 func on_out():
 	if result == 0:
@@ -115,9 +120,12 @@ func _physics_process(delta):
 				$Explosion.frame = 0
 				$Explosion.play()
 				result = CRASHED
+				emit_signal("removed")
 			else:
 				result = LANDED
-				$RemoveTimer.start()
+				emit_signal("removed")
+				if is_bot:
+					$RemoveTimer.start()
 		
 		# Check if it fell outside of bounds
 		if position.y > 200:

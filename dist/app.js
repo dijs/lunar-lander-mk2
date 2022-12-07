@@ -12,12 +12,14 @@ const CRASHED = -1;
 
 const win_points = 100;
 const ground_level = 114;
-const generationSize = 100;
+const generationSize = 64;
 const tooStuckCount = 5;
 
-const winSpeedThreshold = 8;
+const winSpeedThreshold = 10;
 const winAngMomThreshold = 10;
 const upRightRotation = Math.PI / 2;
+
+const networksThatLanded = [];
 
 const actions = {
   nothing: { rotate: 0, thrust: 0 },
@@ -29,14 +31,15 @@ const actions = {
 let generation = 1;
 let networks = {};
 let started = false;
-let lastBestScore = 0;
-let lastBestNetwork = null;
 let stuckCount = 0;
+
+// Needs to be set manually
+let lastBestScore = 146;
+let lastBestNetwork = null;
 
 /////// AI
 
 const input_node_count = 6;
-const output_node_count = 4;
 const decayRate = 0.99;
 
 let learningRate = 0.01;
@@ -47,7 +50,8 @@ const options = {
   outputs: ['nothing', 'thrust', 'rot_left', 'rot_right'],
   task: 'classification',
   noTraining: true,
-  learningRate: 0.05,
+  hiddenUnits: 128,
+  learningRate: 0.01,
 };
 
 ////////////////////////////////////////////////////////////
@@ -116,7 +120,7 @@ function getFitnessScore(status) {
   return (
     win_points -
     getSpeed(status) -
-    Math.abs(status.angular_momentum) * 3 -
+    Math.abs(status.angular_momentum) -
     Math.abs(upRightRotation - status.rotation) -
     // Make the x position not as important as the other variables
     Math.abs(status.x_pos) / 30 -
@@ -142,20 +146,32 @@ function handleLanding(id, status) {
   sendAction(action);
 }
 
+// Looks like the top score could be ~ 166
 function handleLanded(id, status) {
   landers[id].status = LANDED;
 
   // Award more points for better landings
-  const x = winSpeedThreshold - getSpeed(status) * 4;
-  const y = winAngMomThreshold - status.angular_momentum;
-  const z = Math.abs(upRightRotation - status.rotation) * 8;
+  const x = Math.abs(winSpeedThreshold - getSpeed(status)) * 4;
+  const y = Math.abs(winAngMomThreshold - status.angular_momentum);
+  const z = Math.abs(upRightRotation - status.rotation) * 4;
   const k = landers[id].count / 2;
   // TODO: Add time here as well later on
+
+  console.log('landing raw', JSON.stringify(status, null, 3));
 
   // add a bonus so that non-landers will be far from real landers
   const bonus = 50;
 
   landers[id].score = win_points + bonus + x + y - z - k;
+
+  networksThatLanded.push({
+    network: networks[id].copy(),
+    score: landers[id].score,
+  });
+  // Sort from highest to lowest
+  networksThatLanded.sort((a, b) => b.score - a.score);
+
+  console.log(networksThatLanded.map((e) => e.score));
 
   console.log(
     '#',
@@ -169,28 +185,6 @@ function handleLanded(id, status) {
     k
   );
 }
-
-// @ Generation 7
-// # 535 landed with a score of 103.93461480540564 | -0.8892184625433188 9.85 0.5261667320510344 4.5
-// # 539 landed with a score of 103.33588310226042 | -1.487950165688531 9.85 0.5261667320510344 4.5
-// # 572 landed with a score of 100.53460638709464 | -0.5355968808543192 9.85 4.279796732051036 4.5
-
-// # Gen 23
-// # 2133 landed with a score of 124 | -31 10 0.25 4.5
-
-// # Gen 18
-// # 1620 landed with a score of 125 | -29 9.85 0.75 4.5
-
-// # Gen 4
-// # 381 landed with a score of 132 | -23 9.85 0.13 4.5
-
-// Gen 31
-// # 3061 landed with a score of 146 | -8 9.85 1.1 4.5
-
-// TODO: If I want to use a different network size:
-// - Use the old network and create randomly generated inputs to create training data.
-// - Train new network against that training data until error is low
-// - Continue training as I am now with real simulations
 
 function handleCrash(id, status) {
   landers[id].status = CRASHED;
@@ -246,14 +240,18 @@ function gameLoop() {
 
 setInterval(gameLoop, 1000 / fps);
 
-function init() {
+function loadNetwork(cb) {
   lastBestNetwork = ml5.neuralNetwork(options);
   const modelInfo = {
     model: 'http://localhost:8080/model/model.json',
     metadata: 'http://localhost:8080/model/model_meta.json',
     weights: 'http://localhost:8080/model/model.weights.bin',
   };
-  lastBestNetwork.load(modelInfo, () => {
+  lastBestNetwork.load(modelInfo, cb);
+}
+
+function init() {
+  loadNetwork(() => {
     for (let i = 0; i < generationSize; i++) {
       const id = createLander();
       networks[id] = lastBestNetwork.copy();
@@ -337,53 +335,19 @@ function createNextGeneration() {
   generation++;
   const nextGenerationNetworks = {};
 
-  // Decay learning variables
-  // learningRate *= decayRate;
-  // mutateThreshold *= decayRate;
-
-  // TODO: Apparently 0.2 for both is doing well for me
-
-  // if (stuckCount >= tooStuckCount) {
-  //   learningRate = 0.5;
-  //   mutateThreshold = 0.5;
-  //   console.log('Training stagnated. Resetting learning rates');
-  // }
-
-  // document.querySelector('#learning-rate').value = learningRate;
-  // document.querySelector('#mutate-threshold').value = mutateThreshold;
-
-  // Simple version
-
-  // for (let i = 0; i < generationSize; i++) {
-  //   const id = createLander();
-  //   const net = lastBestNetwork.copy();
-  //   net.mutate(learningRate);
-  //   nextGenerationNetworks[id] = net;
-  // }
-
-  const third = Math.floor(generationSize / 3);
-
-  for (let i = 0; i < third; i++) {
+  for (let i = 0; i < generationSize; i++) {
     const id = createLander();
-    const net = lastBestNetwork.copy();
+    let net;
+    // Generate crossovers with winning landers
+    if (i < networksThatLanded.length) {
+      net = lastBestNetwork.crossover(networksThatLanded[i].network);
+    } else {
+      net = lastBestNetwork.copy();
+    }
+    // Use a wave of mutation amounts
+    // const rate = Math.abs(Math.sin(i * 0.1) * 0.01);
     net.mutate(learningRate);
     nextGenerationNetworks[id] = net;
-  }
-
-  // Make sure we have a second best
-  if (top[1]) {
-    for (let i = third; i < third * 2; i++) {
-      const id = createLander();
-      const net = top[1].network.crossover(lastBestNetwork);
-      net.mutate(learningRate);
-      nextGenerationNetworks[id] = net;
-    }
-    for (let i = third * 2; i < generationSize; i++) {
-      const id = createLander();
-      const net = lastBestNetwork.crossover(top[1].network);
-      net.mutate(learningRate);
-      nextGenerationNetworks[id] = net;
-    }
   }
 
   // Clean up previous generation networks
@@ -460,9 +424,66 @@ document.querySelector('#learning-rate').addEventListener('change', (e) => {
   learningRate = parseFloat(e.currentTarget.value);
 });
 
-// document.querySelector('#mutate-threshold').addEventListener('change', (e) => {
-//   mutateThreshold = parseFloat(e.currentTarget.value);
-// });
-
 document.querySelector('#learning-rate').value = learningRate;
-// document.querySelector('#mutate-threshold').value = mutateThreshold;
+
+/////////////////////////////////////// TRAIN NEW NETWORK SIZE //////////////////////////
+
+let nn;
+
+const rn = (min, max) => min + (max - min) * Math.random();
+
+function generateRandomInput() {
+  return getInput({
+    altitude: rn(5, 400),
+    velocity: { x: rn(0, 200), y: rn(0, 100) },
+    rotation: rn(-Math.PI * 2, Math.PI * 2),
+    x_pos: rn(-500, 500),
+    angular_momentum: rn(-30, 30),
+  });
+}
+
+function trainNewNetwork() {
+  const opt = {
+    ...options,
+    debug: true,
+    hiddenUnits: 128,
+    noTraining: false,
+  };
+
+  nn = ml5.neuralNetwork(opt);
+
+  console.log('Generating data');
+
+  // generate and add training data
+  for (let i = 0; i < 50000; i++) {
+    const input = generateRandomInput();
+    const results = lastBestNetwork.classifySync(input);
+    nn.addData(input, [results[0].label]);
+  }
+
+  console.log('Normalizing data');
+
+  // normalize it
+  nn.normalizeData();
+
+  // train the model
+  const training_options = {
+    batchSize: 32,
+    epochs: 10,
+  };
+
+  console.log('Training');
+
+  const started = Date.now();
+
+  nn.train(training_options, () => {
+    console.log('Done training. Took ', Date.now() - started, 'ms');
+    const res = nn.classifySync(generateRandomInput());
+    console.log(res);
+  });
+}
+
+// loadNetwork(() => {
+//   console.log('Loaded old network');
+//   trainNewNetwork();
+// });

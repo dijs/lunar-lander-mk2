@@ -4,6 +4,8 @@ const Lander = preload("res://Lander.tscn")
 
 var _callback_ref = JavaScript.create_callback(self, "on_js_input")
 
+var player_lander = null
+
 func _ready():
 	var dom = JavaScript.get_interface("window")
 	if dom:
@@ -14,6 +16,31 @@ func get_lander(id):
 		if e.id == id:
 			return e
 	return null
+
+func on_player_lander_removed():
+	player_lander = null
+
+func _input(event):
+	if player_lander == null and Input.is_action_just_pressed("start_manual"):
+		player_lander = Lander.instance()
+		player_lander.position = Vector2(-436, -219)
+		player_lander.get_node("TimeoutTimer").stop()
+		player_lander.connect("removed", self, "on_player_lander_removed")
+		add_child(player_lander)
+	if player_lander != null:
+		var nothing = true
+		if Input.is_action_pressed("rotate_left"):
+			player_lander.rotation_input = -1
+			nothing = false
+		if Input.is_action_pressed("rotate_right"):
+			player_lander.rotation_input = 1
+			nothing = false
+		if Input.is_action_pressed("fire_thruster"):
+			player_lander.thrust = player_lander.max_thrust
+			nothing = false
+		if nothing:
+			player_lander.rotation_input = 0
+			player_lander.thrust = 0
 
 func on_js_input(args):
 	var js_event = args[0]
@@ -27,6 +54,7 @@ func on_js_input(args):
 		var e = Lander.instance()
 		e.id = action.id
 		e.position = Vector2(action.x, action.y)
+		e.is_bot = true
 		add_child(e)
 
 	if action.type == "reset":

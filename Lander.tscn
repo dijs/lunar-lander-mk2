@@ -125,4 +125,3 @@ one_shot = true
 [node name="TimeoutTimer" type="Timer" parent="."]
 wait_time = 20.0
 one_shot = true
-autostart = true
