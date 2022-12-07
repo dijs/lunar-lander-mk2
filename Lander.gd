@@ -45,6 +45,24 @@ func on_out():
 		result = CRASHED
 		$RemoveTimer.start()
 
+func dist_to_ray(ray: RayCast2D):
+	if ray.is_colliding():
+		return position.distance_to(ray.get_collision_point())
+	else:
+		return 2048
+
+func get_rays():
+	return {
+		"n": dist_to_ray($Rays/N),
+		"ne": dist_to_ray($Rays/NE),
+		"e": dist_to_ray($Rays/E),
+		"se": dist_to_ray($Rays/SE),
+		"s": dist_to_ray($Rays/S),
+		"sw": dist_to_ray($Rays/SW),
+		"w": dist_to_ray($Rays/W),
+		"nw": dist_to_ray($Rays/NW),
+	}
+
 func get_status():
 	return {
 		"id": id,
@@ -52,10 +70,11 @@ func get_status():
 			"x": velocity.x,
 			"y": velocity.y
 		},
+		"rays": get_rays(),
 		"x_pos": global_position.x,
 		"angular_momentum": spin,
 		"rotation": rotation + PI / 2,
-		"altitude": ground_level - global_position.y,
+#		"altitude": ground_level - global_position.y,
 		"landed": result
 	}
 

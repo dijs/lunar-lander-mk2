@@ -1,3 +1,14 @@
+// Sources:
+
+// 1. get from trello
+// 2. https://github.com/shaoruu/lunar-lander-ai
+
+// After trying different onfigurations of neural networks: single hidden, multi hidden,
+// I was always getting stuck on the very last part of the training. It could make it very close to
+// landing, but would never slow down enough...
+
+// Now I am trying very different inputs. Basically shooting 8 rays from the lander and getting the obstacle collision distance
+
 document.body.style.backgroundColor = 'black';
 
 const fps = 2;
@@ -34,12 +45,14 @@ let started = false;
 let stuckCount = 0;
 
 // Needs to be set manually
-let lastBestScore = 146;
+let lastBestScore = 70;
 let lastBestNetwork = null;
+
+const real_inputs = [];
 
 /////// AI
 
-const input_node_count = 6;
+const input_node_count = 10;
 const decayRate = 0.99;
 
 let learningRate = 0.01;
@@ -50,8 +63,6 @@ const options = {
   outputs: ['nothing', 'thrust', 'rot_left', 'rot_right'],
   task: 'classification',
   noTraining: true,
-  hiddenUnits: 128,
-  learningRate: 0.01,
 };
 
 ////////////////////////////////////////////////////////////
@@ -101,13 +112,21 @@ function normalizeAngle(a) {
   return (rot + Math.PI) / 2;
 }
 
-function getInput({ altitude, velocity, rotation, x_pos, angular_momentum }) {
+// function getInput({ rays, velocity, rotation, x_pos, angular_momentum }) {
+function getInput({ rays, x_pos, angular_momentum }) {
   return [
+    rays.n,
+    rays.ne,
+    rays.e,
+    rays.se,
+    rays.s,
+    rays.sw,
+    rays.w,
+    rays.nw,
     x_pos,
-    altitude - ground_level,
-    velocity.x,
-    velocity.y,
-    normalizeAngle(rotation),
+    // velocity.x,
+    // velocity.y,
+    // normalizeAngle(rotation),
     angular_momentum,
   ];
 }
@@ -133,7 +152,14 @@ function machineLandingAssist(status) {
     console.log('There was not network for lander', status.id);
     return { thrust: 0, rotate: 0 };
   }
-  const results = networks[status.id].classifySync(getInput(status));
+
+  const input = getInput(status);
+
+  if (Math.random() < 0.1) {
+    // real_inputs.push(input);
+  }
+
+  const results = networks[status.id].classifySync(input);
   const action = results[0].label;
   if (action !== 'nothing') {
     landers[status.id].count++;
@@ -191,7 +217,7 @@ function handleCrash(id, status) {
   const score = getFitnessScore(status);
   landers[id].score = score;
   const delta = Math.abs(score - lastBestScore);
-  if (delta < 10) {
+  if (delta < 30) {
     // const since = Date.now() - landers[id].started;
     console.log(
       'Lander #',
@@ -238,14 +264,13 @@ function gameLoop() {
   }
 }
 
-setInterval(gameLoop, 1000 / fps);
-
 function loadNetwork(cb) {
   lastBestNetwork = ml5.neuralNetwork(options);
+  // cb();
   const modelInfo = {
-    model: 'http://localhost:8080/model/model.json',
-    metadata: 'http://localhost:8080/model/model_meta.json',
-    weights: 'http://localhost:8080/model/model.weights.bin',
+    model: 'http://localhost:8080/model/new/model.json',
+    metadata: 'http://localhost:8080/model/new/model_meta.json',
+    weights: 'http://localhost:8080/model/new/model.weights.bin',
   };
   lastBestNetwork.load(modelInfo, cb);
 }
@@ -257,6 +282,7 @@ function init() {
       networks[id] = lastBestNetwork.copy();
     }
     started = true;
+    setInterval(gameLoop, 1000 / fps);
   });
 }
 
@@ -335,6 +361,8 @@ function createNextGeneration() {
   generation++;
   const nextGenerationNetworks = {};
 
+  // Late game
+  /*
   for (let i = 0; i < generationSize; i++) {
     const id = createLander();
     let net;
@@ -346,6 +374,26 @@ function createNextGeneration() {
     }
     // Use a wave of mutation amounts
     // const rate = Math.abs(Math.sin(i * 0.1) * 0.01);
+    net.mutate(learningRate);
+    nextGenerationNetworks[id] = net;
+  }*/
+
+  const third = Math.floor(generationSize / 3);
+  for (let i = 0; i < third; i++) {
+    const id = createLander();
+    const net = lastBestNetwork.copy();
+    net.mutate(learningRate);
+    nextGenerationNetworks[id] = net;
+  }
+  for (let i = third; i < third * 2; i++) {
+    const id = createLander();
+    const net = lastBestNetwork.crossover(top[1].network);
+    net.mutate(learningRate);
+    nextGenerationNetworks[id] = net;
+  }
+  for (let i = third * 2; i < generationSize; i++) {
+    const id = createLander();
+    const net = top[1].network.crossover(lastBestNetwork);
     net.mutate(learningRate);
     nextGenerationNetworks[id] = net;
   }
@@ -418,8 +466,6 @@ function load() {
   // - Call load on neural network from ml5
 }
 
-setTimeout(init, 1000);
-
 document.querySelector('#learning-rate').addEventListener('change', (e) => {
   learningRate = parseFloat(e.currentTarget.value);
 });
@@ -444,35 +490,59 @@ function generateRandomInput() {
 
 function trainNewNetwork() {
   const opt = {
-    ...options,
+    //   inputs: input_node_count,
+    // outputs: ['nothing', 'thrust', 'rot_left', 'rot_right'],
+    task: 'classification',
+    layers: [
+      // Input
+      {
+        type: 'dense',
+        units: 16,
+        activation: 'relu',
+      },
+      // Normalization
+      {
+        type: 'dense',
+        units: 16,
+        activation: 'relu',
+      },
+      // Phase
+      {
+        type: 'dense',
+        units: 4,
+        activation: 'relu',
+      },
+      // Reaction
+      {
+        type: 'dense',
+        activation: 'softmax',
+      },
+    ],
     debug: true,
-    hiddenUnits: 128,
-    noTraining: false,
   };
 
   nn = ml5.neuralNetwork(opt);
 
-  console.log('Generating data');
+  console.log('Loading saved training data');
 
-  // generate and add training data
-  for (let i = 0; i < 50000; i++) {
-    const input = generateRandomInput();
+  // Add parsed training data
+  for (let i = 0; i < real_training_data.length; i++) {
+    const input = real_training_data[i];
+    // Use current best lander model to generate training outputs
     const results = lastBestNetwork.classifySync(input);
     nn.addData(input, [results[0].label]);
   }
 
-  console.log('Normalizing data');
-
-  // normalize it
-  nn.normalizeData();
+  // DO NOT normalize data since we do not normalize it in normal learning mode...
+  // nn.normalizeData();
 
   // train the model
   const training_options = {
     batchSize: 32,
-    epochs: 10,
+    epochs: 32,
   };
 
-  console.log('Training');
+  console.log('Training on generated data');
 
   const started = Date.now();
 
@@ -487,3 +557,8 @@ function trainNewNetwork() {
 //   console.log('Loaded old network');
 //   trainNewNetwork();
 // });
+
+// Start the learing sim
+setTimeout(init, 1000);
+
+// TODO: Remember to reset cache on every reload

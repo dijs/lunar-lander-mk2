@@ -115,9 +115,6 @@ rotation = -3.13644
 scale = Vector2( 0.469248, 0.303909 )
 frames = SubResource( 21 )
 
-[node name="RayCast2D" type="RayCast2D" parent="."]
-enabled = true
-
 [node name="RemoveTimer" type="Timer" parent="."]
 wait_time = 3.0
 one_shot = true
@@ -125,3 +122,45 @@ one_shot = true
 [node name="TimeoutTimer" type="Timer" parent="."]
 wait_time = 20.0
 one_shot = true
+
+[node name="Rays" type="Node2D" parent="."]
+
+[node name="N" type="RayCast2D" parent="Rays"]
+enabled = true
+cast_to = Vector2( 0, -512 )
+collision_mask = 2
+
+[node name="NE" type="RayCast2D" parent="Rays"]
+enabled = true
+cast_to = Vector2( 512, -512 )
+collision_mask = 2
+
+[node name="E" type="RayCast2D" parent="Rays"]
+enabled = true
+cast_to = Vector2( 512, 0 )
+collision_mask = 2
+
+[node name="SE" type="RayCast2D" parent="Rays"]
+enabled = true
+cast_to = Vector2( 512, 512 )
+collision_mask = 2
+
+[node name="S" type="RayCast2D" parent="Rays"]
+enabled = true
+cast_to = Vector2( 0, 512 )
+collision_mask = 2
+
+[node name="SW" type="RayCast2D" parent="Rays"]
+enabled = true
+cast_to = Vector2( -512, 512 )
+collision_mask = 2
+
+[node name="W" type="RayCast2D" parent="Rays"]
+enabled = true
+cast_to = Vector2( -512, 0 )
+collision_mask = 2
+
+[node name="NW" type="RayCast2D" parent="Rays"]
+enabled = true
+cast_to = Vector2( -512, -512 )
+collision_mask = 2

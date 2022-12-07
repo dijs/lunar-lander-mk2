@@ -2,3 +2,4 @@ dist/*
 !dist/app.js
 !dist/libs
 !dist/model
+!dist/inputs.js
