@@ -11,7 +11,7 @@
 
 document.body.style.backgroundColor = 'black';
 
-const fps = 2;
+const fps = 10;
 
 let id_counter = 1;
 
@@ -45,24 +45,44 @@ let started = false;
 let stuckCount = 0;
 
 // Needs to be set manually
-let lastBestScore = 70;
+let lastBestScore = 100;
 let lastBestNetwork = null;
 
 const real_inputs = [];
 
 /////// AI
 
-const input_node_count = 10;
+const input_node_count = 13;
 const decayRate = 0.99;
 
-let learningRate = 0.01;
+let learningRate = 0.001;
 let mutateThreshold = 0.1;
 
 const options = {
   inputs: input_node_count,
   outputs: ['nothing', 'thrust', 'rot_left', 'rot_right'],
   task: 'classification',
+  // layers: [
+  //   {
+  //     type: 'dense',
+  //     units: 16,
+  //     activation: 'relu',
+  //   },
+  //   // Normalization
+  //   {
+  //     type: 'dense',
+  //     units: 32,
+  //     activation: 'relu',
+  //   },
+  //   {
+  //     type: 'dense',
+  //     units: 4,
+  //     activation: 'sigmoid',
+  //   },
+  // ],
+  // hiddenUnits: 32,
   noTraining: true,
+  // learningRate: 0.01,
 };
 
 ////////////////////////////////////////////////////////////
@@ -82,10 +102,12 @@ function getStatus(id) {
     const channel = new MessageChannel();
     // For some reason this is required
     channel.port1.onmessageerror = reject;
-    channel.port1.addEventListener('message', (message) => {
+    function handler(message) {
       resolve(JSON.parse(message.data));
+      channel.port1.removeEventListener('message', handler);
       channel.port1.close();
-    });
+    }
+    channel.port1.addEventListener('message', handler);
     postMessage(data, '*', [channel.port2]);
     channel.port2.close();
   });
@@ -98,10 +120,12 @@ function getLanderCount() {
     const channel = new MessageChannel();
     // For some reason this is required
     channel.port1.onmessageerror = reject;
-    channel.port1.addEventListener('message', (message) => {
+    function handler(message) {
       resolve(message.data);
+      channel.port1.removeEventListener('message', handler);
       channel.port1.close();
-    });
+    }
+    channel.port1.addEventListener('message', handler);
     postMessage(data, '*', [channel.port2]);
     channel.port2.close();
   });
@@ -112,8 +136,7 @@ function normalizeAngle(a) {
   return (rot + Math.PI) / 2;
 }
 
-// function getInput({ rays, velocity, rotation, x_pos, angular_momentum }) {
-function getInput({ rays, x_pos, angular_momentum }) {
+function getInput({ rotation, velocity, rays, x_pos, angular_momentum }) {
   return [
     rays.n,
     rays.ne,
@@ -124,9 +147,9 @@ function getInput({ rays, x_pos, angular_momentum }) {
     rays.w,
     rays.nw,
     x_pos,
-    // velocity.x,
-    // velocity.y,
-    // normalizeAngle(rotation),
+    velocity.x,
+    velocity.y,
+    rotation,
     angular_momentum,
   ];
 }
@@ -139,10 +162,10 @@ function getFitnessScore(status) {
   return (
     win_points -
     getSpeed(status) -
-    Math.abs(status.angular_momentum) -
-    Math.abs(upRightRotation - status.rotation) -
+    Math.abs(status.angular_momentum) * 3 -
+    Math.abs(upRightRotation - status.rotation) * 3 -
     // Make the x position not as important as the other variables
-    Math.abs(status.x_pos) / 30 -
+    Math.abs(status.x_pos) / 20 -
     landers[status.id].count / 4
   );
 }
@@ -155,9 +178,10 @@ function machineLandingAssist(status) {
 
   const input = getInput(status);
 
-  if (Math.random() < 0.1) {
-    // real_inputs.push(input);
-  }
+  // if (Math.random() < 0.1) {
+  // console.log(input);
+  // real_inputs.push(input);
+  // }
 
   const results = networks[status.id].classifySync(input);
   const action = results[0].label;
@@ -190,15 +214,6 @@ function handleLanded(id, status) {
 
   landers[id].score = win_points + bonus + x + y - z - k;
 
-  networksThatLanded.push({
-    network: networks[id].copy(),
-    score: landers[id].score,
-  });
-  // Sort from highest to lowest
-  networksThatLanded.sort((a, b) => b.score - a.score);
-
-  console.log(networksThatLanded.map((e) => e.score));
-
   console.log(
     '#',
     id,
@@ -217,7 +232,7 @@ function handleCrash(id, status) {
   const score = getFitnessScore(status);
   landers[id].score = score;
   const delta = Math.abs(score - lastBestScore);
-  if (delta < 30) {
+  if (delta < 10) {
     // const since = Date.now() - landers[id].started;
     console.log(
       'Lander #',
@@ -277,36 +292,37 @@ function loadNetwork(cb) {
 
 function init() {
   loadNetwork(() => {
-    for (let i = 0; i < generationSize; i++) {
-      const id = createLander();
-      networks[id] = lastBestNetwork.copy();
-    }
+    // for (let i = 0; i < generationSize; i++) {
+    //   const id = createLander();
+    //   networks[id] = lastBestNetwork.copy();
+    //   networks[id].mutate(learningRate);
+    // }
     started = true;
     setInterval(gameLoop, 1000 / fps);
   });
 }
 
-function findBestLanderId() {
-  let bestId = 0;
-  let bestScore = -100000;
-  for (let id in landers) {
-    if (landers[id].gen === generation && landers[id].score > bestScore) {
-      bestScore = landers[id].score;
-      bestId = id;
-    }
-  }
-  console.log(
-    'Best lander was',
-    bestId,
-    'with a score of',
-    Math.round(bestScore)
-  );
-  return bestId;
-}
+// function findBestLanderId() {
+//   let bestId = 0;
+//   let bestScore = -100000;
+//   for (let id in landers) {
+//     if (landers[id].gen === generation && landers[id].score > bestScore) {
+//       bestScore = landers[id].score;
+//       bestId = id;
+//     }
+//   }
+//   console.log(
+//     'Best lander was',
+//     bestId,
+//     'with a score of',
+//     Math.round(bestScore)
+//   );
+//   return bestId;
+// }
 
 const byScore = (a, b) => b.score - a.score;
 
-function getTopNetworks(n = 3) {
+function getTopNetworks(n = 10) {
   return Object.keys(networks)
     .map((id) => ({ ...landers[id] }))
     .sort(byScore)
@@ -326,31 +342,58 @@ function createLander() {
     started: Date.now(),
     // TODO: Add brain property here with neural network if I can get this working...
   };
-  sendAction({ type: 'create', id, x: -436, y: -219 });
+  sendAction({ type: 'create', id, x: -100, y: -200, vx: 10, vy: 0 });
   id_counter += 1;
   return id;
 }
 
+const n = 10;
+
 function createNextGeneration() {
-  // Find current top 3 and add last best
-  let top = getTopNetworks();
-  if (lastBestNetwork) {
-    top.push({ network: lastBestNetwork, score: lastBestScore });
-    top = top.sort(byScore).slice(0, 3);
+  if (Object.keys(networks).length == 0) return;
+
+  // Find current top
+  let top = getTopNetworks(n);
+
+  // if (lastBestNetwork) {
+  //   top.push({ network: lastBestNetwork, score: lastBestScore });
+  //   top = top.sort(byScore).slice(0, 3);
+  // }
+
+  const topScore = top[0].score;
+
+  for (let e of top) {
+    networksThatLanded.push({
+      network: e.network.copy(),
+      score: e.score,
+    });
+  }
+
+  // // Sort from highest to lowest
+  networksThatLanded.sort(byScore);
+
+  // Remove all but 10
+  const removed = networksThatLanded.splice(
+    n,
+    Math.max(0, networksThatLanded.length - n)
+  );
+
+  for (let e of removed) {
+    e.network.dispose();
   }
 
   // Update last best
-  if (top[0].score > lastBestScore) {
+  if (topScore > lastBestScore) {
     lastBestNetwork = top[0].network.copy();
-    lastBestScore = top[0].score;
-    stuckCount = 0;
-  } else {
-    stuckCount++;
+    lastBestScore = topScore;
+    //   stuckCount = 0;
+    // } else {
+    //   stuckCount++;
   }
 
-  if (!lastBestNetwork) {
-    lastBestNetwork = ml5.neuralNetwork(options);
-  }
+  // if (!lastBestNetwork) {
+  //   lastBestNetwork = ml5.neuralNetwork(options);
+  // }
 
   // Update chart
   data[0].push(generation);
@@ -362,7 +405,6 @@ function createNextGeneration() {
   const nextGenerationNetworks = {};
 
   // Late game
-  /*
   for (let i = 0; i < generationSize; i++) {
     const id = createLander();
     let net;
@@ -372,13 +414,11 @@ function createNextGeneration() {
     } else {
       net = lastBestNetwork.copy();
     }
-    // Use a wave of mutation amounts
-    // const rate = Math.abs(Math.sin(i * 0.1) * 0.01);
     net.mutate(learningRate);
     nextGenerationNetworks[id] = net;
-  }*/
+  }
 
-  const third = Math.floor(generationSize / 3);
+  /*const third = Math.floor(generationSize / 3);
   for (let i = 0; i < third; i++) {
     const id = createLander();
     const net = lastBestNetwork.copy();
@@ -396,7 +436,7 @@ function createNextGeneration() {
     const net = top[1].network.crossover(lastBestNetwork);
     net.mutate(learningRate);
     nextGenerationNetworks[id] = net;
-  }
+  }*/
 
   // Clean up previous generation networks
   for (let id in networks) {
@@ -562,3 +602,8 @@ function trainNewNetwork() {
 setTimeout(init, 1000);
 
 // TODO: Remember to reset cache on every reload
+
+function test() {
+  const id = createLander();
+  networks[id] = lastBestNetwork.copy();
+}

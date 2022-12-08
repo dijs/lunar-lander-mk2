@@ -23,7 +23,7 @@ func on_player_lander_removed():
 func _input(event):
 	if player_lander == null and Input.is_action_just_pressed("start_manual"):
 		player_lander = Lander.instance()
-		player_lander.position = Vector2(-436, -219)
+		player_lander.position = Vector2(0, -219)
 		player_lander.get_node("TimeoutTimer").stop()
 		player_lander.connect("removed", self, "on_player_lander_removed")
 		add_child(player_lander)
@@ -54,6 +54,7 @@ func on_js_input(args):
 		var e = Lander.instance()
 		e.id = action.id
 		e.position = Vector2(action.x, action.y)
+		e.initial_velocity = Vector2(action.vx, action.vy)
 		e.is_bot = true
 		add_child(e)
 

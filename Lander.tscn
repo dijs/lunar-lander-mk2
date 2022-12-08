@@ -85,7 +85,6 @@ animations = [ {
 } ]
 
 [node name="Lander" type="KinematicBody2D" groups=["lander"]]
-rotation = -1.5708
 collision_mask = 2
 script = ExtResource( 1 )
 

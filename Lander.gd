@@ -3,8 +3,8 @@ extends KinematicBody2D
 signal removed
 
 # Presets which determine different scenarios
-export var initial_velocity = Vector2.RIGHT * 100
-export var initial_rotation = -PI / 2
+export var initial_velocity = Vector2.ZERO
+export var initial_rotation = 0 # -PI / 2
 export var gravity_pull = Vector2.DOWN * 5
 export var initial_spin = 0
 export var initial_fuel = 10
