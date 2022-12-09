@@ -1,20 +1,25 @@
-// TODO: Add visualization with uPlot later...
-
 class Evolution {
-  constructor({ inputs, outputs, generationSize = 100, topSize = 10 }) {
+  constructor({
+    inputs,
+    outputs,
+    generationSize = 100,
+    topSize = 10,
+    learningRate = 0.02,
+    ...networkOptions
+  }) {
     this.nextNodeId = 0;
     this.nodes = {};
     this.generationSize = generationSize;
     this.topSize = topSize;
     this.generation = 1;
-    this.learningRate = 0.1;
-    this.decayRate = 0.99;
+    this.learningRate = learningRate;
     this.currentTopId = -1;
     this.config = {
       inputs,
       outputs,
       task: 'classification',
       noTraining: true,
+      ...networkOptions,
     };
   }
 
@@ -22,6 +27,14 @@ class Evolution {
     for (let i = 0; i < this.generationSize; i++) {
       this.addRandomNode();
     }
+  }
+
+  getTopBrain() {
+    return this.nodes[this.currentTopId].brain;
+  }
+
+  printTopWeights() {
+    this.getTopBrain().neuralNetwork.model.layers[0].getWeights()[0].print();
   }
 
   save() {
@@ -64,6 +77,7 @@ class Evolution {
       survived: true,
       brain,
     };
+    // brain.neuralNetworkData.meta = null;
     return id;
   }
 
@@ -72,9 +86,22 @@ class Evolution {
   }
 
   getAction(id, input) {
-    const results = this.nodes[id].brain.classifySync(input);
-    const action = results[0].label;
-    return action;
+    if (this.config.task === 'classification') {
+      const results = this.nodes[id].brain.classifySync(input);
+      const action = results[0].label;
+      return action;
+    } else {
+      const brain = this.nodes[id].brain;
+      const meta = brain.neuralNetworkData.meta;
+      const inputData = brain.formatInputsForPredictionAll(
+        input,
+        meta,
+        Object.keys(meta.inputs)
+      );
+      const results = brain.neuralNetwork.classifySync(inputData);
+      inputData.dispose();
+      return results[0];
+    }
   }
 
   getNodeKeys() {
@@ -117,7 +144,7 @@ class Evolution {
     for (let i = 0; i < this.generationSize - survivedCount; i++) {
       let brain;
       // Generate crossovers with top scorers
-      if (i < survivedCount) {
+      /*if (i < survivedCount) {
         const b = this.nodes[sorted[i].id].brain;
         if (Math.random() > 0.5) {
           brain = topBrain.crossover(b);
@@ -126,11 +153,11 @@ class Evolution {
         }
       } else {
         brain = topBrain.copy();
-      }
+      }*/
+      brain = topBrain.copy();
       brain.mutate(this.learningRate);
       this.addNode(brain);
     }
-    this.learningRate *= this.decayRate;
     // Return top score for fun
     return this.nodes[sorted[0].id].score;
   }

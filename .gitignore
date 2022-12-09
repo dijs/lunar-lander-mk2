@@ -5,3 +5,8 @@ dist/*
 !dist/inputs.js
 !dist/lib.js
 !dist/app-v2.js
+!dist/test.html
+!dist/test.js
+!dist/test2.js
+!dist/test3.js
+!dist/mona.jpeg
