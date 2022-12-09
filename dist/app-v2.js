@@ -36,8 +36,15 @@ let actionsTook = {};
 const ai = new Evolution({
   inputs: 13,
   outputs: ['nothing', 'thrust', 'rot_left', 'rot_right'],
-  generationSize: 64,
+  generationSize: 16,
+  topSize: 10,
+  hiddenUnits: 8,
 });
+
+let data = [
+  [], // x-values (timestamps)
+  [], // y-values (series 1)
+];
 
 ////////////////////////////////////////////////////////////
 
@@ -99,7 +106,7 @@ function getFitnessScore(status) {
     win_points -
     getSpeed(status) -
     Math.abs(status.angular_momentum) * 3 -
-    Math.abs(upRightRotation - status.rotation) * 3 -
+    // Math.abs(upRightRotation - status.rotation) * 3 -
     // Make the x position not as important as the other variables
     Math.abs(status.x_pos) / 20 -
     actionsTook[status.id] / 4
@@ -126,7 +133,7 @@ function handleLanded(id, status) {
     // Award more points for better landings
     const x = Math.abs(winSpeedThreshold - getSpeed(status)) * 4;
     const y = Math.abs(winAngMomThreshold - status.angular_momentum);
-    const z = Math.abs(upRightRotation - status.rotation) * 4;
+    const z = 0; //Math.abs(upRightRotation - status.rotation) * 4;
     const k = actionsTook[id] / 2;
     // TODO: Add time here as well later on
 
@@ -204,10 +211,16 @@ function gameLoop() {
 }
 
 function createLanders() {
-  // statuses = {};
-  // actionsTook = {};
   for (let id of ai.getNodeKeys()) {
-    sendAction({ type: 'create', id, x: -100, y: -200, vx: 20, vy: 0 });
+    sendAction({
+      type: 'create',
+      id,
+      x: -200,
+      y: -200,
+      vx: 100,
+      vy: 0,
+      rot: -Math.PI / 2,
+    });
     statuses[id] = LANDING;
     actionsTook[id] = 0;
   }
@@ -222,20 +235,66 @@ function createNextGeneration() {
     'Top score was',
     Math.round(topScore)
   );
+  // Update chart
+  data[0].push(ai.generation);
+  data[1].push(topScore);
+  uplot.setData(data);
 }
 
 function save() {
   ai.save();
 }
 
-// Start the learing sim
+// Start the learning sim
 setTimeout(() => {
-  ai.load({
-    model: 'http://localhost:8080/model/new/model.json',
-    metadata: 'http://localhost:8080/model/new/model_meta.json',
-    weights: 'http://localhost:8080/model/new/model.weights.bin',
-  }).then(() => {
-    createLanders();
-    setInterval(gameLoop, 1000 / fps);
-  });
+  // ai.load({
+  //   model: 'http://localhost:8080/model/lander/model.json',
+  //   metadata: 'http://localhost:8080/model/lander/model_meta.json',
+  //   weights: 'http://localhost:8080/model/lander/model.weights.bin',
+  // }).then(() => {
+  //   createLanders();
+  //   setInterval(gameLoop, 1000 / fps);
+  // });
+
+  ai.createRandomGeneration();
+
+  createLanders();
+  setInterval(gameLoop, 1000 / fps);
 }, 1000);
+
+let opts = {
+  width: 400,
+  height: 100,
+  pxAlign: false,
+  cursor: {
+    show: false,
+  },
+  select: {
+    show: false,
+  },
+  legend: {
+    show: false,
+  },
+  scales: {
+    x: {
+      time: false,
+    },
+  },
+  axes: [
+    {
+      show: false,
+    },
+    {
+      show: false,
+    },
+  ],
+  series: [
+    {},
+    {
+      stroke: '#03a9f4',
+      fill: '#b3e5fc',
+    },
+  ],
+};
+
+let uplot = new uPlot(opts, data, document.body);

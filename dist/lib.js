@@ -144,7 +144,7 @@ class Evolution {
     for (let i = 0; i < this.generationSize - survivedCount; i++) {
       let brain;
       // Generate crossovers with top scorers
-      /*if (i < survivedCount) {
+      if (i < survivedCount) {
         const b = this.nodes[sorted[i].id].brain;
         if (Math.random() > 0.5) {
           brain = topBrain.crossover(b);
@@ -153,8 +153,7 @@ class Evolution {
         }
       } else {
         brain = topBrain.copy();
-      }*/
-      brain = topBrain.copy();
+      }
       brain.mutate(this.learningRate);
       this.addNode(brain);
     }

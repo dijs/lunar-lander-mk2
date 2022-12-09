@@ -55,6 +55,7 @@ func on_js_input(args):
 		e.id = action.id
 		e.position = Vector2(action.x, action.y)
 		e.initial_velocity = Vector2(action.vx, action.vy)
+		e.initial_rotation = action.rot
 		e.is_bot = true
 		add_child(e)
 
