@@ -74,7 +74,7 @@ func get_status():
 		"x_pos": global_position.x,
 		"angular_momentum": spin,
 		"rotation": rotation + PI / 2,
-#		"altitude": ground_level - global_position.y,
+		"altitude": ground_level - global_position.y,
 		"landed": result
 	}
 

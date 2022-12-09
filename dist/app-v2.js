@@ -10,7 +10,10 @@
 // Decided the code was getting to messy and I was not making good enough progress... so I decided to refactor out
 // the genetics code into a separate library
 
-// Now I am trying very different inputs. Basically shooting 8 rays from the lander and getting the obstacle collision distance
+// * Now I am trying very different inputs. Basically shooting 8 rays from the lander and getting the obstacle collision distance
+//    - Not entirely sure this had a postive effect on the learning...
+
+// * Altitude is a VERY important input to send since it basically triggers when the network should start another maneuver
 
 document.body.style.backgroundColor = 'black';
 
@@ -30,15 +33,18 @@ const actions = {
 };
 
 let started = false;
-let statuses = {};
-let actionsTook = {};
+const statuses = {};
+const landed = {};
+const actionsTook = {};
 
 const ai = new Evolution({
-  inputs: 13,
+  inputs: 14,
   outputs: ['nothing', 'thrust', 'rot_left', 'rot_right'],
-  generationSize: 16,
+  generationSize: 20,
   topSize: 10,
   hiddenUnits: 8,
+  // learningRate: 0.01,
+  // crosstrain: false,
 });
 
 let data = [
@@ -79,21 +85,29 @@ function normalizeAngle(a) {
   return (rot + Math.PI) / 2;
 }
 
-function getInput({ rotation, velocity, rays, x_pos, angular_momentum }) {
+function getInput({
+  rotation,
+  velocity,
+  rays,
+  x_pos,
+  angular_momentum,
+  altitude,
+}) {
   return [
-    rays.n,
-    rays.ne,
-    rays.e,
-    rays.se,
-    rays.s,
-    rays.sw,
-    rays.w,
-    rays.nw,
-    x_pos,
+    rays.n / 2048,
+    rays.ne / 2048,
+    rays.e / 2048,
+    rays.se / 2048,
+    rays.s / 2048,
+    rays.sw / 2048,
+    rays.w / 2048,
+    rays.nw / 2048,
+    x_pos / 500,
     velocity.x,
     velocity.y,
     rotation,
     angular_momentum,
+    altitude,
   ];
 }
 
@@ -146,6 +160,8 @@ function handleLanded(id, status) {
 
     ai.setScore(id, score);
 
+    landed[id] = true;
+
     console.log(
       '#',
       id,
@@ -161,6 +177,12 @@ function handleLanded(id, status) {
 }
 
 function handleCrash(id, status) {
+  // Do let previously landed brains be mutated
+  if (landed[id]) {
+    console.log('Skipping crash for previously landed #', id);
+    return;
+  }
+
   if (statuses[id] === LANDING) {
     const score = getFitnessScore(status);
     ai.setScore(id, score);
@@ -257,7 +279,6 @@ setTimeout(() => {
   // });
 
   ai.createRandomGeneration();
-
   createLanders();
   setInterval(gameLoop, 1000 / fps);
 }, 1000);

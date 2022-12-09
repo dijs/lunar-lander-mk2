@@ -5,6 +5,7 @@ class Evolution {
     generationSize = 100,
     topSize = 10,
     learningRate = 0.02,
+    crosstrain = true,
     ...networkOptions
   }) {
     this.nextNodeId = 0;
@@ -14,6 +15,7 @@ class Evolution {
     this.generation = 1;
     this.learningRate = learningRate;
     this.currentTopId = -1;
+    this.crosstrain = crosstrain;
     this.config = {
       inputs,
       outputs,
@@ -144,12 +146,16 @@ class Evolution {
     for (let i = 0; i < this.generationSize - survivedCount; i++) {
       let brain;
       // Generate crossovers with top scorers
-      if (i < survivedCount) {
-        const b = this.nodes[sorted[i].id].brain;
-        if (Math.random() > 0.5) {
-          brain = topBrain.crossover(b);
+      if (this.crosstrain) {
+        if (i < survivedCount) {
+          const b = this.nodes[sorted[i].id].brain;
+          if (Math.random() > 0.5) {
+            brain = topBrain.crossover(b);
+          } else {
+            brain = b.crossover(topBrain);
+          }
         } else {
-          brain = b.crossover(topBrain);
+          brain = topBrain.copy();
         }
       } else {
         brain = topBrain.copy();
