@@ -24,7 +24,8 @@ const CRASHED = -1;
 const win_points = 100;
 const winSpeedThreshold = 10;
 const winAngMomThreshold = 10;
-const upRightRotation = Math.PI / 2;
+const upRightRotation = 0.5;
+
 const actions = {
   nothing: { rotate: 0, thrust: 0 },
   thrust: { rotate: 0, thrust: 1 },
@@ -35,14 +36,15 @@ const actions = {
 let started = false;
 const statuses = {};
 const landed = {};
-const actionsTook = {};
 
 const ai = new Evolution({
-  inputs: 14,
+  // inputs: 14,
+  // inputs: 6,
+  inputs: 5,
   outputs: ['nothing', 'thrust', 'rot_left', 'rot_right'],
-  generationSize: 20,
-  topSize: 10,
-  hiddenUnits: 8,
+  generationSize: 16,
+  topSize: 5,
+  // hiddenUnits: 8,
   // learningRate: 0.01,
   // crosstrain: false,
 });
@@ -80,34 +82,43 @@ function getStatus(id) {
   });
 }
 
+// Makes the angle between 0 and 1
 function normalizeAngle(a) {
   let rot = Math.atan2(Math.sin(a), Math.cos(a));
   return (rot + Math.PI) / 2;
 }
 
 function getInput({
-  rotation,
-  velocity,
-  rays,
-  x_pos,
-  angular_momentum,
-  altitude,
+  r,
+  x,
+  y,
+  ux,
+  uy,
+  // velocity,
+  // rays,
+  // angular_momentum,
 }) {
   return [
-    rays.n / 2048,
-    rays.ne / 2048,
-    rays.e / 2048,
-    rays.se / 2048,
-    rays.s / 2048,
-    rays.sw / 2048,
-    rays.w / 2048,
-    rays.nw / 2048,
-    x_pos / 500,
-    velocity.x,
-    velocity.y,
-    rotation,
-    angular_momentum,
-    altitude,
+    x,
+    y,
+    r,
+    ux,
+    uy,
+    // rays.n / 2048,
+    // rays.ne / 2048,
+    // rays.e / 2048,
+    // rays.se / 2048,
+    // rays.s / 2048,
+    // rays.sw / 2048,
+    // rays.w / 2048,
+    // rays.nw / 2048,
+    // x_pos / 500,
+    // normalizeAngle(rotation),
+    // altitude / 1000,
+    // velocity.x,
+    // velocity.y,
+    // rotation,
+    // angular_momentum,
   ];
 }
 
@@ -115,24 +126,42 @@ function getSpeed(status) {
   return Math.sqrt(status.velocity.y ** 2 + status.velocity.x ** 2);
 }
 
+const FUEL_WEIGHT = 3;
+const SPEED_WEIGHT = 3;
+const ANGLE_DIFF_WEIGHT = 100;
+const ANGULAR_MOM_WEIGHT = 3;
+const TARGET_WEIGHT = 32;
+
 function getFitnessScore(status) {
-  return (
-    win_points -
-    getSpeed(status) -
-    Math.abs(status.angular_momentum) * 3 -
-    // Math.abs(upRightRotation - status.rotation) * 3 -
-    // Make the x position not as important as the other variables
-    Math.abs(status.x_pos) / 20 -
-    actionsTook[status.id] / 4
-  );
+  const fuelUsed = 10 - status.fuel;
+  const angleDiff = Math.abs(upRightRotation - status.r);
+  const speed = getSpeed(status);
+  const distanceFromTarget = Math.abs(status.x);
+  const angMom = Math.abs(status.angular_momentum);
+
+  console.log({
+    fuelUsed,
+    angleDiff,
+    speed,
+    distanceFromTarget,
+    angMom,
+  });
+
+  const error =
+    fuelUsed * FUEL_WEIGHT +
+    angleDiff * ANGLE_DIFF_WEIGHT +
+    speed * SPEED_WEIGHT +
+    distanceFromTarget * TARGET_WEIGHT +
+    angMom * ANGULAR_MOM_WEIGHT;
+
+  const landingScore = status.landed * 100;
+
+  return landingScore - error;
 }
 
 function getAction(status) {
   const input = getInput(status);
   const action = ai.getAction(status.id, input);
-  if (action !== 'nothing') {
-    actionsTook[status.id]++;
-  }
   return actions[action];
 }
 
@@ -144,44 +173,19 @@ function handleLanding(id, status) {
 // Looks like the top score could be ~ 166
 function handleLanded(id, status) {
   if (statuses[id] === LANDING) {
-    // Award more points for better landings
-    const x = Math.abs(winSpeedThreshold - getSpeed(status)) * 4;
-    const y = Math.abs(winAngMomThreshold - status.angular_momentum);
-    const z = 0; //Math.abs(upRightRotation - status.rotation) * 4;
-    const k = actionsTook[id] / 2;
-    // TODO: Add time here as well later on
-
-    console.log('landing raw', JSON.stringify(status, null, 3));
-
-    // add a bonus so that non-landers will be far from real landers
-    const bonus = 50;
-
-    const score = win_points + bonus + x + y - z - k;
-
+    const score = getFitnessScore(status);
     ai.setScore(id, score);
-
     landed[id] = true;
-
-    console.log(
-      '#',
-      id,
-      'landed with a score of',
-      Math.round(score),
-      '|',
-      x,
-      y,
-      z,
-      k
-    );
+    console.log('#', id, 'landed with a score of', Math.round(score));
   }
 }
 
 function handleCrash(id, status) {
   // Do let previously landed brains be mutated
-  if (landed[id]) {
-    console.log('Skipping crash for previously landed #', id);
-    return;
-  }
+  // if (landed[id]) {
+  //   console.log('Skipping crash for previously landed #', id);
+  //   return;
+  // }
 
   if (statuses[id] === LANDING) {
     const score = getFitnessScore(status);
@@ -192,17 +196,15 @@ function handleCrash(id, status) {
       'crashed with a score of',
       // Math.round(since / 1000),
       // 'seconds with a score of',
-      Math.round(score),
-      '| speed',
-      Math.round(getSpeed(status)),
-      ',ang mom',
-      Math.round(status.angular_momentum),
-      ',x',
-      Math.round(status.x_pos),
-      ' | used',
-      actionsTook[id],
-      'actions | rot was',
-      Math.round(status.rotation * (180 / Math.PI))
+      Math.round(score)
+      // '| speed',
+      // Math.round(getSpeed(status)),
+      // ',ang mom',
+      // Math.round(status.angular_momentum),
+      // ',x',
+      // Math.round(status.x_pos),
+      // ' | rot: ',
+      // Math.round(status.rotation * (180 / Math.PI))
     );
   }
 }
@@ -244,7 +246,6 @@ function createLanders() {
       rot: -Math.PI / 2,
     });
     statuses[id] = LANDING;
-    actionsTook[id] = 0;
   }
 }
 
@@ -269,18 +270,18 @@ function save() {
 
 // Start the learning sim
 setTimeout(() => {
-  // ai.load({
-  //   model: 'http://localhost:8080/model/lander/model.json',
-  //   metadata: 'http://localhost:8080/model/lander/model_meta.json',
-  //   weights: 'http://localhost:8080/model/lander/model.weights.bin',
-  // }).then(() => {
-  //   createLanders();
-  //   setInterval(gameLoop, 1000 / fps);
-  // });
+  ai.load({
+    model: 'http://localhost:3000/model/lander/model.json',
+    metadata: 'http://localhost:3000/model/lander/model_meta.json',
+    weights: 'http://localhost:3000/model/lander/model.weights.bin',
+  }).then(() => {
+    createLanders();
+    setInterval(gameLoop, 1000 / fps);
+  });
 
-  ai.createRandomGeneration();
-  createLanders();
-  setInterval(gameLoop, 1000 / fps);
+  // ai.createRandomGeneration();
+  // createLanders();
+  // setInterval(gameLoop, 1000 / fps);
 }, 1000);
 
 let opts = {

@@ -70,11 +70,14 @@ func get_status():
 			"x": velocity.x,
 			"y": velocity.y
 		},
+		"ux": velocity.normalized().x,
+		"uy": velocity.normalized().y,
 		"rays": get_rays(),
-		"x_pos": global_position.x,
+		"x": global_position.x / 500.0,
+		"y": (global_position.y - 114.0) / (-414.0),
+		"r": (rotation + PI) / PI / 2,
 		"angular_momentum": spin,
-		"rotation": rotation + PI / 2,
-		"altitude": ground_level - global_position.y,
+		"fuel": fuel,
 		"landed": result
 	}
 
@@ -104,6 +107,9 @@ func get_angular_speed(delta):
 func _physics_process(delta):
 	if thrust > 0 and fuel <= 0:
 		thrust = 0
+	
+#	var s = get_status()
+#	$Debug.text = str("UX: ", s["ux"], "\nUY: ", s["uy"], "\nX: ", s["x"], "\nY: ", s["y"], "\nR: ", s["r"])
 	
 	var thrusting = thrust > 0
 	

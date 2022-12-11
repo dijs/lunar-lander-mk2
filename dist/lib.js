@@ -79,11 +79,14 @@ class Evolution {
       survived: true,
       brain,
     };
-    // brain.neuralNetworkData.meta = null;
     return id;
   }
 
   setScore(id, score) {
+    // if (this.currentTopId === id && score < this.nodes[id].score) {
+    // Do not allow the current top brain to fall in score
+    //   return;
+    // }
     this.nodes[id].score = score;
   }
 
@@ -126,7 +129,15 @@ class Evolution {
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, this.topSize);
-    this.currentTopId = sorted[0].id;
+
+    const topId = sorted[0].id;
+    this.currentTopId = topId;
+
+    console.log(
+      'Top scores',
+      sorted.map((e) => e.score)
+    );
+
     // Keep top nodes
     for (let n of sorted) {
       this.nodes[n.id].survived = true;
@@ -138,8 +149,9 @@ class Evolution {
         this.nodes[id] = undefined;
       }
     }
-    // Breed next generation
-    const topBrain = this.nodes[sorted[0].id].brain;
+
+    // Breed next generation using best brain
+    const topBrain = this.nodes[topId].brain;
     this.generation++;
     const survivedCount = sorted.length;
     // Generate nodes to replace who was lost
@@ -164,6 +176,6 @@ class Evolution {
       this.addNode(brain);
     }
     // Return top score for fun
-    return this.nodes[sorted[0].id].score;
+    return this.nodes[topId].score;
   }
 }
